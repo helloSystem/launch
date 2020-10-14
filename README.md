@@ -1,4 +1,4 @@
-# launch
+# launch [![Build Status](https://api.cirrus-ci.com/github/helloSystem/launch.svg)](https://cirrus-ci.com/github/helloSystem/launch)
 
 Command line tool to launch applications, will search for `.app` bundles and `.AppDir` directories in various directories, and will show launch errors in the GUI. Filer, Dock, and other applications are supposed to use `launch` to launch applications. It can also be invoked from the command line.
 
