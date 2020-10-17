@@ -15,6 +15,8 @@ make
 
 In general, `launch` shows error messages that would otherwise get printed to stderr (and hence be invisible for GUI users) in a dialog box.
 
+![image](https://user-images.githubusercontent.com/2480569/96336678-be08b780-1081-11eb-8665-32eee927f231.png)
+
 Some of the default error messages are less then user friendly, and do not give any clues to the user on how the situation can be resolved:
 
 ![image](https://user-images.githubusercontent.com/2480569/96020556-84039f80-0e4e-11eb-9a43-dd21b28e209b.png)
