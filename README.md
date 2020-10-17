@@ -13,7 +13,7 @@ make
 
 ## Types of error messages
 
-In general, `launch` shows error messages that would otherwise get printed to stderr (and hence be invisible fot GUI users) in a dialog box.
+In general, `launch` shows error messages that would otherwise get printed to stderr (and hence be invisible for GUI users) in a dialog box.
 
 Some of the default error messages are less then user friendly, and do not give any clues to the user on how the situation can be resolved:
 
