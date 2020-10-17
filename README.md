@@ -23,6 +23,8 @@ Hence, `launch` can handle certain types of error messages and provide more usef
 
 ![image](https://user-images.githubusercontent.com/2480569/96335893-0cb35300-107c-11eb-9871-76e477391202.png)
 
+![image](https://user-images.githubusercontent.com/2480569/96336616-60746b00-1081-11eb-9c1e-a8c06da46e2a.png)
+
 It is also possible to get additional information, e.g., from the package manager:
 
 ![image](https://user-images.githubusercontent.com/2480569/96335900-1f2d8c80-107c-11eb-9b30-5925d6d06df0.png)
