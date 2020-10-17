@@ -11,6 +11,9 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# probono: Set rpath
+set(CMAKE_INSTALL_RPATH $ORIGIN/../lib)
+
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
 add_executable(launch
@@ -18,3 +21,7 @@ add_executable(launch
 )
 
 target_link_libraries(launch PRIVATE Qt5::Widgets)
+
+# probono: Make installable
+install(TARGETS launch
+        RUNTIME DESTINATION bin)
