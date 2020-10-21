@@ -11,6 +11,16 @@
 #include <QRegExpValidator>
 
 /*
+ * This tool handles four types of applications:
+ * 1. Executables on the $PATH
+ * 2. Simplified .app bundles (Convention: AppName.app/AppName is an executable) in well-known locations
+ * 3. Simplified .AppDir directories (Convention: AppName[.AppDir]/AppRun is an executable) in well-known locations
+ * 4. AppName.desktop files in well-known locations (TODO: Not implemented yet)
+ *
+ * Usage:
+ * launch <application to be launched> [<arguments>]    Launch the specified application
+ * launch -l                                            Print well-known locations for applications
+ * launch -a                                            List all applications in well-known locations
 
 Similar to:
 https://github.com/probonopd/appwrapper
@@ -113,35 +123,70 @@ int main(int argc, char *argv[])
 
     args.pop_front();
 
+    QStringList locationsContainingApps = {};
+
+    // Add some location in $HOME
+    locationsContainingApps.append(QDir::homePath() + "/Applications");
+    locationsContainingApps.append(QDir::homePath() + "/bin");
+    locationsContainingApps.append(QDir::homePath() + "/.bin");
+
+    // Add system-wide locations
+    // TODO: Find a better and more complete way to specify the GNUstep ones
+    locationsContainingApps.append({"/Applications", "/System", "/Library",
+                                           "/usr/local/GNUstep/Local/Applications",
+                                           "/usr/local/GNUstep/System/Applications",
+                                           "/usr/GNUstep/Local/Applications",
+                                           "/usr/GNUstep/System/Applications"
+                                          });
+
+    // Add legacy locations for XDG compatibility
+    // On FreeBSD: "/home/user/.local/share/applications", "/usr/local/share/applications", "/usr/share/applications"
+    locationsContainingApps.append(QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation));
+
     if(args.isEmpty()){
         qDebug() << "USAGE:" << argv[0] << "<application to be launched> [<arguments>]" ;
         exit(1);
+    }
+
+    if(args[0] == "-l") {
+       args.pop_front();
+       qDebug() << locationsContainingApps;
+       exit(0);
+    }
+
+    bool printAll = false;
+    if(args[0] == "-a") {
+       args.pop_front();
+       printAll = true;
     }
 
     QDetachableProcess p;
 
     // Check whether the first argument exists or is on the $PATH
 
-    // First, try to find an executable file at the path in the first argument
     QString executable = nullptr;
-    QString firstArg = args.first();
-    if (QFile::exists(firstArg)){
-        QFileInfo info = QFileInfo(firstArg);
-        if (info.isExecutable()){
-            qDebug() << "Found" << args.first();
-            executable = args.first();
+    QString firstArg = nullptr;
+    if(printAll == false) {
+        // First, try to find an executable file at the path in the first argument
+
+        firstArg = args.first();
+        if (QFile::exists(firstArg)){
+            QFileInfo info = QFileInfo(firstArg);
+            if (info.isExecutable()){
+                qDebug() << "Found" << args.first();
+                executable = args.first();
+            }
+        }
+
+        // Second, try to find an executable file on the $PATH
+        if(executable == nullptr){
+            QString candidate = QStandardPaths::findExecutable(firstArg);
+            if (candidate != "") {
+                qDebug() << "Found" << candidate << "on the $PATH";
+                executable = candidate; // Returns the absolute file path to the executable, or an empty string if not found
+            }
         }
     }
-
-    // Second, try to find an executable file on the $PATH
-    if(executable == nullptr){
-        QString candidate = QStandardPaths::findExecutable(firstArg);
-        if (candidate != "") {
-            qDebug() << "Found" << candidate << "on the $PATH";
-            executable = candidate; // Returns the absolute file path to the executable, or an empty string if not found
-        }
-    }
-
     // Third, if still not found, then try other means of location
     // the preferred instance of the requested application, e.g., from a list of
     // directories that hold .desktop files, .app bundles, .AppDir directories, or from a database.
@@ -156,29 +201,10 @@ int main(int argc, char *argv[])
         QElapsedTimer timer;
         timer.start();
 
-        QStringList locationsContainingApps = {};
-
-        // Add some location in $HOME
-        locationsContainingApps.append(QDir::homePath() + "/Applications");
-        locationsContainingApps.append(QDir::homePath() + "/bin");
-        locationsContainingApps.append(QDir::homePath() + "/.bin");
-
-        // Add system-wide locations
-        // TODO: Find a better and more complete way to specify the GNUstep ones
-        locationsContainingApps.append({"/Applications", "/System", "/Library",
-                                               "/usr/local/GNUstep/Local/Applications",
-                                               "/usr/local/GNUstep/System/Applications",
-                                               "/usr/GNUstep/Local/Applications",
-                                               "/usr/GNUstep/System/Applications"
-                                              });
-
-        // Add legacy locations for XDG compatibility
-        // On FreeBSD: "/home/user/.local/share/applications", "/usr/local/share/applications", "/usr/share/applications"
-        locationsContainingApps.append(QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation));
-
-        qDebug() << locationsContainingApps;
-
         // Iterate recursively through locationsContainingApps searching for AppRun files in matchingly named AppDirs
+        // FIXME: This is too slow. We need to find a way NOT to decend into AppDirs and .app bundles further!
+        // Possibly we need to use something else than QDirIterator to traverse the tree.
+        // And maybe limit the number of subdirectories searched.
         QFileInfoList candidates;
         foreach (QString directory, locationsContainingApps) {
             QDirIterator it(directory, QDirIterator::Subdirectories);
@@ -186,14 +212,22 @@ int main(int argc, char *argv[])
                 QString filename = it.next();
                 QFileInfo file(filename);
                 if (file.isDir()) {
+                    if (printAll == true && filename.endsWith(".app")){
+                        QString AppCand = filename + "/" + QFileInfo(file).baseName();
+                        qDebug() << "################### Checking" << AppCand;
+                        if(QFileInfo(AppCand).exists() == true){
+                            qDebug() << "# Found" << AppCand;
+                            candidates.append(AppCand);
+                        }
+                    }
                     continue;
                 }
                 if (file.fileName() == "AppRun") {
                     // .AppDir
                     QString AppDirPath = QFileInfo(file).dir().path();
                     // Note: baseName() returns the name without the leading path and without suffixes
-                    if (QFileInfo(AppDirPath).baseName() == firstArg.replace(".AppDir", "")) {
-                        qDebug() << "Found" << file;
+                    if (printAll == true || QFileInfo(AppDirPath).baseName() == firstArg.replace(".AppDir", "")) {
+                        qDebug() << "# Found" << file;
                         candidates.append(file);
                     }
                 } else if (file.fileName() == firstArg.replace(".app", "")) {
@@ -201,18 +235,18 @@ int main(int argc, char *argv[])
                     QString AppBundlePath = QFileInfo(file).dir().path();
                     // Note: baseName() returns the name without the leading path and without suffixes
                     if (QFileInfo(AppBundlePath).baseName() == firstArg.replace(".app", "")) {
-                        qDebug() << "Found" << file;
+                        qDebug() << "# Found" << file;
                         candidates.append(file);
                     }
                 }
-                else if (file.fileName() == firstArg + ".desktop") {
+                else if ((printAll == true && file.fileName().endsWith(".desktop")) || file.fileName() == firstArg + ".desktop") {
                     // .desktop file
-                    qDebug() << "Found" << file.fileName() << "TODO: Parse it for Exec=";
+                    qDebug() << "# Found" << file.fileName() << "TODO: Parse it for Exec=";
                 }
             }
         }
 
-        qDebug() << "Took" << timer.elapsed() << "milliseconds to find candidates via the filesystem";
+        qDebug() << "Took" << timer.elapsed() << "milliseconds to find candidates via the filesystem; FIXME: Use more efficient algorithm";
 
         foreach (QFileInfo candidate, candidates) {
             // Now that we may have collected different candidates, decide on which one to use
@@ -220,8 +254,14 @@ int main(int argc, char *argv[])
             // For now, just use the first one
             qDebug() << "Candidate:" << candidate.absoluteFilePath();
             executable = candidate.absoluteFilePath();
-            break;
+            if(printAll == false) {
+                break;
+            }
         }
+    }
+
+    if(printAll == true) {
+        exit(0);
     }
 
     p.setProgram(executable);
@@ -245,8 +285,6 @@ int main(int argc, char *argv[])
     p.waitForFinished(3 * 1000); // Blocks until process has finished or timeout occured (x seconds)
     // Errors occuring thereafter will not be reported to the user in a message box anymore.
     // This should cover most errors like missing libraries, missing interpreters, etc.
-
-
 
     if (p.state() == 0 and p.exitCode() != 0) {
         qDebug("Process is not running anymore and exit code was not 0");
