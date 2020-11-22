@@ -190,6 +190,8 @@ int main(int argc, char *argv[])
     // On FreeBSD: "/home/user/.local/share/applications", "/usr/local/share/applications", "/usr/share/applications"
     locationsContainingApps.append(QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation));
 
+    locationsContainingApps.removeDuplicates(); // Make unique
+
     if(args.isEmpty()){
         qDebug() << "USAGE:" << argv[0] << "<application to be launched> [<arguments>]" ;
         exit(1);
