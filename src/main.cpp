@@ -144,7 +144,7 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
                 // Shall we descend into it? Only if it contains at least one application, to optimize for speed
                 // by not descending into directory trees that do not contain any applications at all. Can make
                 // a big difference.
-                QStringList nameFilter({"*.app", "*.AppDir", ".desktop"});
+                QStringList nameFilter({"*.app", "*.AppDir", "*.desktop"});
                 QDir directory(filename);
                 int numberOfAppsInDirectory = directory.entryList(nameFilter).length();
                 if(numberOfAppsInDirectory > 0) {
