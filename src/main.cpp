@@ -298,9 +298,11 @@ int main(int argc, char *argv[])
     // TODO: Now would be a good time to signal the Dock to start showing a bouncing the icon of the
     // application that is being launched, until the application has its own icon in the Dock
 
-    p.waitForFinished(3 * 1000); // Blocks until process has finished or timeout occured (x seconds)
+    p.waitForFinished(10 * 1000); // Blocks until process has finished or timeout occured (x seconds)
     // Errors occuring thereafter will not be reported to the user in a message box anymore.
     // This should cover most errors like missing libraries, missing interpreters, etc.
+    // FIXME: If this period is set too small, then apparently the payload application
+    // can crash (especially if it launches subprocesses?). Why?
 
     if (p.state() == 0 and p.exitCode() != 0) {
         qDebug("Process is not running anymore and exit code was not 0");
