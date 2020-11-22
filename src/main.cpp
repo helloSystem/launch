@@ -140,10 +140,18 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
                 qDebug() << "# Found" << file.fileName() << "TODO: Parse it for Exec=";
             }
             else if (locationsContainingApps.contains(filename) == false && file.isDir() && filename.endsWith("/..") == false && filename.endsWith("/.") == false && filename.endsWith(".app") == false && filename.endsWith(".AppDir") == false) {
-                // A directory that is not an .app bundle nor an .AppDir
-                qDebug() << "# Descending into" << filename;
-                QStringList locationsToBeChecked = {filename};
-                candidates = findAppsInside(locationsToBeChecked, candidates, firstArg);
+                // Now we have a directory that is not an .app bundle nor an .AppDir
+                // Shall we descend into it? Only if it contains at least one application, to optimize for speed
+                // by not descending into directory trees that do not contain any applications at all. Can make
+                // a big difference.
+                QStringList nameFilter({"*.app", "*.AppDir", ".desktop"});
+                QDir directory(filename);
+                int numberOfAppsInDirectory = directory.entryList(nameFilter).length();
+                if(numberOfAppsInDirectory > 0) {
+                    qDebug() << "# Descending into" << filename;
+                    QStringList locationsToBeChecked = {filename};
+                    candidates = findAppsInside(locationsToBeChecked, candidates, firstArg);
+                }
             }
         }
     }
