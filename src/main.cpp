@@ -210,13 +210,29 @@ int main(int argc, char *argv[])
     QString executable = nullptr;
     QString firstArg = nullptr;
 
-    // First, try to find an executable file at the path in the first argument
-
+    // First, try to find something we can launch at the path,
+    // either an executable or an .AppDir or an .app bundle
     firstArg = args.first();
     if (QFile::exists(firstArg)){
         QFileInfo info = QFileInfo(firstArg);
-        if (info.isExecutable()){
-            qDebug() << "Found" << args.first();
+        if (info.isDir() && ( firstArg.endsWith(".AppDir") || firstArg.endsWith(".app") )){
+            qDebug() << "# Found directory" << firstArg;
+            QString candidate;
+            if(firstArg.endsWith(".AppDir")) {
+                candidate = firstArg + "/AppRun";
+            }
+            else {
+                candidate = firstArg + "/" + info.baseName();
+            }
+
+            QFileInfo candinfo = QFileInfo(candidate);
+            if(candinfo.isExecutable()) {
+                executable = candidate;
+            }
+
+        }
+        else if (info.isExecutable()){
+            qDebug() << "# Found executable" << firstArg;
             executable = args.first();
         }
     }
