@@ -9,6 +9,7 @@
 #include <QTime>
 #include <QElapsedTimer>
 #include <QRegExpValidator>
+#include <QApplication>
 
 /*
  * This tool handles four types of applications:
@@ -82,10 +83,12 @@ QString getPackageUpdateCommand(QString pathToInstalledFile){
 void handleError(QDetachableProcess *p, QString errorString){
     QRegExp rx(".*ld-elf.so.1: (.*): version (.*) required by (.*) not found.*");
     QRegExp rxPy(".*ModuleNotFoundError: No module named '(.*)'.*");
+    QFileInfo fi(p->program());
+    QString title = fi.completeBaseName(); // https://doc.qt.io/qt-5/qfileinfo.html#completeBaseName
     if(errorString.contains("FATAL: kernel too old")) {
         QString cleartextString = "The Linux compatibility layer reports an older kernel version than what is required to run this application.\n\n" \
                                   "Please run\nsudo sysctl compat.linux.osrelease=5.0.0\nand try again.";
-        QMessageBox::warning( nullptr, p->program(), cleartextString );
+        QMessageBox::warning( nullptr, title, cleartextString );
     } else if (rx.indexIn(errorString) == 0) {
         QString outdatedLib = rx.cap(1);
         QString versionNeeded = rx.cap(2);
@@ -99,13 +102,13 @@ void handleError(QDetachableProcess *p, QString errorString){
         } else {
             cleartextString.append(QString("\n\nPlease update it and try again.").arg(getPackageUpdateCommand(outdatedLib)));
         }
-        QMessageBox::warning( nullptr, p->program(), cleartextString );
+        QMessageBox::warning( nullptr, title, cleartextString );
     } else if (rxPy.indexIn(errorString) == 0) {
         QString missingPyModule = rxPy.cap(1);
         QString cleartextString = QString("This application requires the Python module %1 to run.\n\nPlease install it and try again.").arg(missingPyModule);
-        QMessageBox::warning( nullptr, p->program(), cleartextString );
+        QMessageBox::warning( nullptr, title, cleartextString );
     } else {
-        QMessageBox::warning( nullptr, p->program(), errorString );
+        QMessageBox::warning( nullptr, title, errorString );
     }
 }
 
@@ -161,10 +164,14 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
 int main(int argc, char *argv[])
 {
 
+    QApplication app(argc, argv);
+
+    // Setting a busy cursor in this way seems only to affect the own application's windows
+    // rather than the full screen, which is why it is not suitable for this tool
+    // QApplication::setOverrideCursor(Qt::WaitCursor);
+
     // Launch an application but initially watch for errors and display a Qt error message
     // if needed. After some timeout, detach the process of the application, and exit this helper
-
-    QApplication app(argc, argv);
 
     QStringList args = app.arguments();
 
@@ -286,6 +293,7 @@ int main(int argc, char *argv[])
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     // env.insert("QT_SCALE_FACTOR", "2");
     p.setProcessEnvironment(env);
+    p.setProcessChannelMode(QProcess::ForwardedOutputChannel); // Forward standard output onto the main process
 
     p.start();
 
@@ -301,8 +309,6 @@ int main(int argc, char *argv[])
     p.waitForFinished(10 * 1000); // Blocks until process has finished or timeout occured (x seconds)
     // Errors occuring thereafter will not be reported to the user in a message box anymore.
     // This should cover most errors like missing libraries, missing interpreters, etc.
-    // FIXME: If this period is set too small, then apparently the payload application
-    // can crash (especially if it launches subprocesses?). Why?
 
     if (p.state() == 0 and p.exitCode() != 0) {
         qDebug("Process is not running anymore and exit code was not 0");
@@ -314,10 +320,7 @@ int main(int argc, char *argv[])
             return(p.exitCode());
         }
     } else {
-        // Print normal output to stdout; test with e.g., 'launch ls'
-        QString out = p.readAllStandardOutput();
-        QTextStream(stdout) << out;
-
+        p.setProcessChannelMode(QProcess::ForwardedChannels); // Forward standard error onto the main process as well
         p.detach();
         return(0);
     }
