@@ -293,7 +293,8 @@ int main(int argc, char *argv[])
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     // env.insert("QT_SCALE_FACTOR", "2");
     p.setProcessEnvironment(env);
-    p.setProcessChannelMode(QProcess::ForwardedOutputChannel); // Forward standard output onto the main process
+
+    p.setProcessChannelMode(QProcess::ForwardedOutputChannel); // Forward stdout onto the main process
 
     p.start();
 
@@ -306,25 +307,25 @@ int main(int argc, char *argv[])
     // TODO: Now would be a good time to signal the Dock to start showing a bouncing the icon of the
     // application that is being launched, until the application has its own icon in the Dock
 
-    p.waitForFinished(10 * 1000); // Blocks until process has finished or timeout occured (x seconds)
+    p.waitForFinished(3 * 1000); // Blocks until process has finished or timeout occured (x seconds)
     // Errors occuring thereafter will not be reported to the user in a message box anymore.
     // This should cover most errors like missing libraries, missing interpreters, etc.
 
     if (p.state() == 0 and p.exitCode() != 0) {
         qDebug("Process is not running anymore and exit code was not 0");
-
         const QString error = p.readAllStandardError();
         if (!error.isEmpty()) {
             qDebug() << error;
             handleError(&p, error);
-            return(p.exitCode());
         }
-    } else {
-        p.setProcessChannelMode(QProcess::ForwardedChannels); // Forward standard error onto the main process as well
-        p.detach();
-        return(0);
+        return(p.exitCode());
     }
 
-    return(1);
+    // Crude workaround for https://github.com/helloSystem/launch/issues/4
+    // FIXME: Find a way to p.detach(); and return(0); without crashing the payload application
+    // when it writes to stderr
+
+    p.waitForFinished(-1);
+
 }
 
