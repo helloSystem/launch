@@ -120,7 +120,7 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
         while (it.hasNext()) {
             QString filename = it.next();
             // qDebug() << "probono: Processing" << filename;
-            QString nameWithoutSuffix = QFileInfo(filename).baseName();
+            QString nameWithoutSuffix = QFileInfo(QDir(filename).canonicalPath()).baseName();
             QFileInfo file(filename);
             if (file.fileName() == firstArg + ".app"){
                 QString AppCand = filename + "/" + nameWithoutSuffix;
@@ -222,14 +222,17 @@ int main(int argc, char *argv[])
     firstArg = args.first();
     if (QFile::exists(firstArg)){
         QFileInfo info = QFileInfo(firstArg);
-        if (info.isDir() && ( firstArg.endsWith(".AppDir") || firstArg.endsWith(".app") )){
-            qDebug() << "# Found directory" << firstArg;
+        if ( firstArg.endsWith(".AppDir") || firstArg.endsWith(".app") ){
+            qDebug() << "# Found" << firstArg;
             QString candidate;
             if(firstArg.endsWith(".AppDir")) {
                 candidate = firstArg + "/AppRun";
             }
             else {
-                candidate = firstArg + "/" + info.baseName();
+                // The .app could be a symlink, so we need to determine the nameWithoutSuffix from its target
+                QFileInfo fileInfo = QFileInfo(QDir(firstArg).canonicalPath());
+                QString nameWithoutSuffix = QFileInfo(fileInfo.completeBaseName()).fileName();
+                candidate = firstArg + "/" + nameWithoutSuffix;
             }
 
             QFileInfo candinfo = QFileInfo(candidate);
