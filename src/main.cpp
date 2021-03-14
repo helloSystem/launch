@@ -150,7 +150,7 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
                 QString AppCand = desktopFile.value("Desktop Entry/Exec");
                 
                 // null safety check
-                if (AppCand != null) {
+                if (AppCand != NULL) {
                     qDebug() << "# Found" << AppCand;
                     candidates.append(AppCand);
                 }
