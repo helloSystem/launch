@@ -53,3 +53,6 @@ compile_commands.json
 
 # ignore build directory
 build
+.kdev4/
+
+launch.kdev4

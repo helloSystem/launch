@@ -13,6 +13,8 @@
 #include <QSettings>
 #include <QIcon>
 #include <QStyle>
+#include <QVersionNumber>
+#include "utils/finder.h"
 
 /*
  * This tool handles four types of applications:
@@ -126,68 +128,6 @@ void handleError(QDetachableProcess *p, QString errorString){
     }
 }
 
-
-QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList candidates, QString firstArg)
-{
-    foreach (QString directory, locationsContainingApps) {
-        QDirIterator it(directory, QDirIterator::NoIteratorFlags);
-        while (it.hasNext()) {
-            QString filename = it.next();
-            // qDebug() << "probono: Processing" << filename;
-            QString nameWithoutSuffix = QFileInfo(QDir(filename).canonicalPath()).baseName();
-            QFileInfo file(filename);
-            if (file.fileName() == firstArg + ".app"){
-                QString AppCand = filename + "/" + nameWithoutSuffix;
-                qDebug() << "################### Checking" << AppCand;
-                if(QFileInfo(AppCand).exists() == true){
-                    qDebug() << "# Found" << AppCand;
-                    candidates.append(AppCand);
-                }
-            }
-            else if (file.fileName() == firstArg + ".AppDir"){
-                QString AppCand = filename + "/" + "AppRun";
-                qDebug() << "################### Checking" << AppCand;
-                if(QFileInfo(AppCand).exists() == true){
-                    qDebug() << "# Found" << AppCand;
-                    candidates.append(AppCand);
-                }
-            }
-            else if (file.fileName() == firstArg + ".AppImage") {
-                QString AppCand = filename;
-                candidates.append(AppCand);
-            }
-            else if (file.fileName() == firstArg + ".desktop") {
-                // load the .desktop file for parsing - QSettings::IniFormat returns values as strings by default
-                // see https://doc.qt.io/qt-5/qsettings.html
-                QSettings desktopFile(filename, QSettings::IniFormat);
-                QString AppCand = desktopFile.value("Desktop Entry/Exec").toString();
-                
-                // null safety check
-                if (AppCand != NULL) {
-                    qDebug() << "# Found" << AppCand;
-                    candidates.append(AppCand);
-                }
-                qDebug() << "# Found" << file.fileName() << "TODO: Parse it for Exec=";
-            }
-            else if (locationsContainingApps.contains(filename) == false && file.isDir() && filename.endsWith("/..") == false && filename.endsWith("/.") == false && filename.endsWith(".app") == false && filename.endsWith(".AppDir") == false && filename.endsWith(".AppImage") == false) {
-                // Now we have a directory that is not an .app bundle nor an .AppDir
-                // Shall we descend into it? Only if it contains at least one application, to optimize for speed
-                // by not descending into directory trees that do not contain any applications at all. Can make
-                // a big difference.
-                QStringList nameFilter({"*.app", "*.AppDir", "*.desktop", "*.AppImage"});
-                QDir directory(filename);
-                int numberOfAppsInDirectory = directory.entryList(nameFilter).length();
-                if(numberOfAppsInDirectory > 0) {
-                    qDebug() << "# Descending into" << filename;
-                    QStringList locationsToBeChecked = {filename};
-                    candidates = findAppsInside(locationsToBeChecked, candidates, firstArg);
-                }
-            }
-        }
-    }
-    return candidates;
-}
-
 int main(int argc, char *argv[])
 {
 
@@ -238,7 +178,8 @@ int main(int argc, char *argv[])
     }
 
     QDetachableProcess p;
-
+    Finder finder;
+    
     // Check whether the first argument exists or is on the $PATH
 
     QString executable = nullptr;
@@ -247,39 +188,11 @@ int main(int argc, char *argv[])
     // First, try to find something we can launch at the path,
     // either an executable or an .AppDir or an .app bundle
     firstArg = args.first();
-    if (QFile::exists(firstArg)){
-        QFileInfo info = QFileInfo(firstArg);
-        if ( firstArg.endsWith(".AppDir") || firstArg.endsWith(".app") || firstArg.endsWith(".AppImage") ){
-            qDebug() << "# Found" << firstArg;
-            QString candidate;
-            if(firstArg.endsWith(".AppDir")) {
-                candidate = firstArg + "/AppRun";
-            }
-            else if (firstArg.endsWith(".AppImage")) {
-                // this is a .AppImage file, we have nothing else to do here, so just make it a candidate
-                candidate = firstArg;
-            }
-            else {
-                // The .app could be a symlink, so we need to determine the nameWithoutSuffix from its target
-                QFileInfo fileInfo = QFileInfo(QDir(firstArg).canonicalPath());
-                QString nameWithoutSuffix = QFileInfo(fileInfo.completeBaseName()).fileName();
-                candidate = firstArg + "/" + nameWithoutSuffix;
-            }
-
-            QFileInfo candinfo = QFileInfo(candidate);
-            if(candinfo.isExecutable()) {
-                executable = candidate;
-            }
-
-        }
-        else if (info.isExecutable()){
-            qDebug() << "# Found executable" << firstArg;
-            executable = args.first();
-        }
-    }
-
+    
+    executable = finder.getExecutable(firstArg);    
+    
     // Second, try to find an executable file on the $PATH
-    if(executable == nullptr){
+    if(executable == nullptr) {
         QString candidate = QStandardPaths::findExecutable(firstArg);
         if (candidate != "") {
             qDebug() << "Found" << candidate << "on the $PATH";
@@ -306,19 +219,42 @@ int main(int argc, char *argv[])
         QFileInfoList candidates;
         QString firstArgWithoutWellKnownSuffix = firstArg.replace(".AppDir", "").replace(".app", "").replace(".desktop" ,"").replace(".AppImage", "");
 
-        candidates = findAppsInside(locationsContainingApps, candidates, firstArgWithoutWellKnownSuffix);
+        candidates = finder.findAppsInside(locationsContainingApps, candidates, firstArgWithoutWellKnownSuffix);
 
         qDebug() << "Took" << timer.elapsed() << "milliseconds to find candidates via the filesystem";
         qDebug() << "Candidates:" << candidates;
-
-        foreach (QFileInfo candidate, candidates) {
-            // Now that we may have collected different candidates, decide on which one to use
-            // e.g., the one with the highest self-declared version number. Again, a database might come in handy here
-            // For now, just use the first one
-            qDebug() << "Selected candidate:" << candidate.absoluteFilePath();
-            executable = candidate.absoluteFilePath();
-            break;
+        
+        QFileInfo candidate;
+        QFileInfoList::iterator it;
+        
+        // Attempt version detection
+        if (candidates.size() > 1) {
+            
+            // todo: loop through and compare versions
+            candidate = candidates.first().absoluteFilePath();
+            for (int i = 0; i < candidates.size(); i++)
+            {
+                QStringList previousVersion = candidate.fileName().split("-");
+                QStringList curVersion = candidates[i].fileName().split("-");
+                
+                QVersionNumber previousVer = QVersionNumber::fromString(previousVersion[1]);
+                QVersionNumber newVer = QVersionNumber::fromString(curVersion[1]);
+                
+                int compare = QVersionNumber::compare(previousVer, newVer);
+                qDebug() << compare;
+                if (compare == -1) {
+                    // previous one is older, use newer one
+                    candidate = candidates[i].absoluteFilePath();
+                }
+            }
+            
+        } else {
+            candidate = candidates.first().absoluteFilePath();   
         }
+        
+        qDebug() << "Selected candidate:" << candidate.absoluteFilePath();
+        executable = candidate.absoluteFilePath();
+       
     }
 
     p.setProgram(executable);
