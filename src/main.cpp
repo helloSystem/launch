@@ -151,7 +151,7 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
                 
                 // null safety check
                 if (AppCand != null) {
-                    qDebug << "# Found" << AppCand;
+                    qDebug() << "# Found" << AppCand;
                     candidates.append(AppCand);
                 }
                 qDebug() << "# Found" << file.fileName() << "TODO: Parse it for Exec=";
