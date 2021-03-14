@@ -146,7 +146,7 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
             else if (file.fileName() == firstArg + ".desktop") {
                 // load the .desktop file for parsing - QSettings::IniFormat returns values as strings by default
                 // see https://doc.qt.io/qt-5/qsettings.html
-                QSettings desktopFile = QSettings(filename, QSettings::IniFormat)
+                QSettings desktopFile = QSettings(filename, QSettings::IniFormat);
                 QString AppCand = desktopFile.value("Desktop Entry/Exec");
                 
                 // null safety check
