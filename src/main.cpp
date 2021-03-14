@@ -10,6 +10,7 @@
 #include <QElapsedTimer>
 #include <QRegExpValidator>
 #include <QApplication>
+#include <QSettings>
 
 /*
  * This tool handles four types of applications:
@@ -138,8 +139,21 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
                     candidates.append(AppCand);
                 }
             }
+            else if (file.fileName() == firstArg + ".AppImage") {
+                QString AppCand = filename;
+                candidates.append(AppCand);
+            }
             else if (file.fileName() == firstArg + ".desktop") {
-                // .desktop file
+                // load the .desktop file for parsing - QSettings::IniFormat returns values as strings by default
+                // see https://doc.qt.io/qt-5/qsettings.html
+                QSettings desktopFile = QSettings(filename, QSettings::IniFormat)
+                QString AppCand = desktopFile.value("Desktop Entry/Exec");
+                
+                // null safety check
+                if (AppCand != null) {
+                    qDebug << "# Found" << AppCand;
+                    candidates.append(AppCand);
+                }
                 qDebug() << "# Found" << file.fileName() << "TODO: Parse it for Exec=";
             }
             else if (locationsContainingApps.contains(filename) == false && file.isDir() && filename.endsWith("/..") == false && filename.endsWith("/.") == false && filename.endsWith(".app") == false && filename.endsWith(".AppDir") == false) {
@@ -147,7 +161,7 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
                 // Shall we descend into it? Only if it contains at least one application, to optimize for speed
                 // by not descending into directory trees that do not contain any applications at all. Can make
                 // a big difference.
-                QStringList nameFilter({"*.app", "*.AppDir", "*.desktop"});
+                QStringList nameFilter({"*.app", "*.AppDir", "*.desktop", ".AppImage"});
                 QDir directory(filename);
                 int numberOfAppsInDirectory = directory.entryList(nameFilter).length();
                 if(numberOfAppsInDirectory > 0) {
@@ -222,11 +236,15 @@ int main(int argc, char *argv[])
     firstArg = args.first();
     if (QFile::exists(firstArg)){
         QFileInfo info = QFileInfo(firstArg);
-        if ( firstArg.endsWith(".AppDir") || firstArg.endsWith(".app") ){
+        if ( firstArg.endsWith(".AppDir") || firstArg.endsWith(".app") || firstArg.endsWith(".AppImage") ){
             qDebug() << "# Found" << firstArg;
             QString candidate;
             if(firstArg.endsWith(".AppDir")) {
                 candidate = firstArg + "/AppRun";
+            }
+            else if (firstArg.endsWith(".AppImage")) {
+                // this is a .AppImage file, we have nothing else to do here, so just make it a candidate
+                candidate = firstArg;
             }
             else {
                 // The .app could be a symlink, so we need to determine the nameWithoutSuffix from its target
@@ -273,7 +291,7 @@ int main(int argc, char *argv[])
         // Iterate recursively through locationsContainingApps searching for AppRun files in matchingly named AppDirs
 
         QFileInfoList candidates;
-        QString firstArgWithoutWellKnownSuffix = firstArg.replace(".AppDir", "").replace(".app", "").replace(".desktop" ,"");
+        QString firstArgWithoutWellKnownSuffix = firstArg.replace(".AppDir", "").replace(".app", "").replace(".desktop" ,"").replace(".AppImage", "");
 
         candidates = findAppsInside(locationsContainingApps, candidates, firstArgWithoutWellKnownSuffix);
 
