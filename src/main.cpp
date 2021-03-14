@@ -11,6 +11,8 @@
 #include <QRegExpValidator>
 #include <QApplication>
 #include <QSettings>
+#include <QIcon>
+#include <QStyle>
 
 /*
  * This tool handles four types of applications:
@@ -82,6 +84,17 @@ QString getPackageUpdateCommand(QString pathToInstalledFile){
 
 // Translate cryptic errors into clear text, and possibly even offer buttons to take action
 void handleError(QDetachableProcess *p, QString errorString){
+    QMessageBox qmesg;
+
+    // Make this error message not appear in the Dock // FIXME: Does not work, why?
+    qmesg.setWindowFlag(Qt::SubWindow);
+
+    // If we can't make the icon go away in the Dock, at least make it a non-placeholder icon
+    // Not sure if the Dock is already reflecting the WindowIcon correctly
+    // FIXME: Does not work, why?
+    QIcon icon = QApplication::style()->standardIcon(QStyle::SP_MessageBoxWarning);
+    qmesg.setWindowIcon(icon);
+
     QRegExp rx(".*ld-elf.so.1: (.*): version (.*) required by (.*) not found.*");
     QRegExp rxPy(".*ModuleNotFoundError: No module named '(.*)'.*");
     QFileInfo fi(p->program());
@@ -89,7 +102,7 @@ void handleError(QDetachableProcess *p, QString errorString){
     if(errorString.contains("FATAL: kernel too old")) {
         QString cleartextString = "The Linux compatibility layer reports an older kernel version than what is required to run this application.\n\n" \
                                   "Please run\nsudo sysctl compat.linux.osrelease=5.0.0\nand try again.";
-        QMessageBox::warning( nullptr, title, cleartextString );
+        qmesg.warning( nullptr, title, cleartextString );
     } else if (rx.indexIn(errorString) == 0) {
         QString outdatedLib = rx.cap(1);
         QString versionNeeded = rx.cap(2);
@@ -103,13 +116,13 @@ void handleError(QDetachableProcess *p, QString errorString){
         } else {
             cleartextString.append(QString("\n\nPlease update it and try again.").arg(getPackageUpdateCommand(outdatedLib)));
         }
-        QMessageBox::warning( nullptr, title, cleartextString );
+        qmesg.warning( nullptr, title, cleartextString );
     } else if (rxPy.indexIn(errorString) == 0) {
         QString missingPyModule = rxPy.cap(1);
         QString cleartextString = QString("This application requires the Python module %1 to run.\n\nPlease install it and try again.").arg(missingPyModule);
-        QMessageBox::warning( nullptr, title, cleartextString );
+        qmesg.warning( nullptr, title, cleartextString );
     } else {
-        QMessageBox::warning( nullptr, title, errorString );
+        qmesg.warning( nullptr, title, errorString );
     }
 }
 
