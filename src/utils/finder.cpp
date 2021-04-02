@@ -16,8 +16,9 @@ QFileInfoList Finder::findAppsInside(QStringList locationsContainingApps, QFileI
             // qDebug() << "probono: Processing" << filename;
             QString nameWithoutSuffix = QFileInfo(QDir(filename).canonicalPath()).baseName();
             QFileInfo file(filename);
-                        
-            if (file.fileName() == firstArg + ".app"){
+            
+            if (file.fileName() == firstArg + ".app") {
+                qDebug() << filename;
                 QString AppCand = filename + "/" + nameWithoutSuffix;
                 qDebug() << "################### Checking" << AppCand;
                 if(QFileInfo(AppCand).exists() == true){
@@ -25,7 +26,7 @@ QFileInfoList Finder::findAppsInside(QStringList locationsContainingApps, QFileI
                     candidates.append(AppCand);
                 }
             }
-            else if (file.fileName() == firstArg + ".AppDir"){
+            else if (file.fileName() == firstArg + ".AppDir") {
                 QString AppCand = filename + "/" + "AppRun";
                 
                 qDebug() << "################### Checking" << AppCand;
@@ -34,7 +35,7 @@ QFileInfoList Finder::findAppsInside(QStringList locationsContainingApps, QFileI
                     candidates.append(AppCand);
                 }
             }
-            else if (file.fileName() == firstArg + ".AppImage" || file.fileName() == firstArg.replace(" ", "_") + ".AppImage" || file.fileName().endsWith(".AppName") &  file.fileName().startsWith(firstArg + "-") || file.fileName().startsWith(firstArg.replace(" ", "_") + "-")) {
+            else if (file.fileName().endsWith(".AppImage") && (file.fileName().contains(firstArg) || file.fileName().contains(firstArg.replace(" ", "_")))) {
                 QString AppCand = getExecutable(filename);
                 candidates.append(AppCand);
             }
@@ -66,6 +67,7 @@ QFileInfoList Finder::findAppsInside(QStringList locationsContainingApps, QFileI
             }
         }
     }
+    
     return candidates;
 }
 

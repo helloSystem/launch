@@ -224,37 +224,45 @@ int main(int argc, char *argv[])
         qDebug() << "Took" << timer.elapsed() << "milliseconds to find candidates via the filesystem";
         qDebug() << "Candidates:" << candidates;
         
-        QFileInfo candidate;
+        QFileInfo candidate = candidates.first().absoluteFilePath();
         QFileInfoList::iterator it;
         
+        qDebug() << candidate;
+                
         // Attempt version detection
         if (candidates.size() > 1) {
             
             // todo: loop through and compare versions
-            candidate = candidates.first().absoluteFilePath();
+            
             for (int i = 0; i < candidates.size(); i++)
             {
-                QStringList previousVersion = candidate.fileName().split("-");
-                QStringList curVersion = candidates[i].fileName().split("-");
+                if (!candidate.fileName().contains("-")) {
+                        candidate = candidates[i].absoluteFilePath();
+                        continue;
+                }
                 
-                QVersionNumber previousVer = QVersionNumber::fromString(previousVersion[1]);
-                QVersionNumber newVer = QVersionNumber::fromString(curVersion[1]);
+                try {
+                    QStringList previousVersion = candidate.fileName().split("-");
+                    QStringList curVersion = candidates[i].fileName().split("-");
                 
-                int compare = QVersionNumber::compare(previousVer, newVer);
-                qDebug() << compare;
-                if (compare == -1) {
-                    // previous one is older, use newer one
-                    candidate = candidates[i].absoluteFilePath();
+                    QVersionNumber previousVer = QVersionNumber::fromString(previousVersion[1]);
+                    QVersionNumber newVer = QVersionNumber::fromString(curVersion[1]);
+                
+                    int compare = QVersionNumber::compare(previousVer, newVer);
+                    qDebug() << compare;
+                    if (compare == -1) {
+                        // previous one is older, use newer one
+                        candidate = candidates[i].absoluteFilePath();
+                    }
+                } catch(std::exception &e) {
+                    // catch any exeption that may occure
+                    qDebug() << "Failed to compare application versions";
                 }
             }
-            
-        } else {
-            candidate = candidates.first().absoluteFilePath();   
-        }
+        } 
         
         qDebug() << "Selected candidate:" << candidate.absoluteFilePath();
         executable = candidate.absoluteFilePath();
-       
     }
 
     p.setProgram(executable);
