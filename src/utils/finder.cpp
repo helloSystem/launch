@@ -35,7 +35,7 @@ QFileInfoList Finder::findAppsInside(QStringList locationsContainingApps, QFileI
                     candidates.append(AppCand);
                 }
             }
-            else if (file.fileName().endsWith(".AppImage") && (file.fileName().contains(firstArg) || file.fileName().contains(firstArg.replace(" ", "_")))) {
+            else if (file.fileName() == firstArg + ".AppImage" || file.fileName() == firstArg.replace(" ", "_") + ".AppImage" || file.fileName().endsWith(".AppName") & file.fileName().startsWith(firstArg + "-") || file.fileName().startsWith(firstArg.replace(" ", "_") + "-")) {
                 QString AppCand = getExecutable(filename);
                 candidates.append(AppCand);
             }
