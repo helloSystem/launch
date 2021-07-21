@@ -308,6 +308,18 @@ int main(int argc, char *argv[])
     p.setArguments(args);
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     // env.insert("QT_SCALE_FACTOR", "2");
+
+    // Set LAUNCHED_EXECUTABLE and LAUNCHED_BUNDLE environment variables
+    // On FreeBSD, can use
+    // procstat -e $(xprop | grep PID | cut -d " " -f 3)
+    // to get these for any given Xorg window
+    env.insert("LAUNCHED_EXECUTABLE", executable);
+    QFileInfo info = QFileInfo(executable);
+    if ( info.dir().absolutePath().endsWith(".AppDir") || info.dir().absolutePath().endsWith(".app") ){
+        // qDebug() << "# Bundle" << info.dir().absolutePath();
+        env.insert("LAUNCHED_BUNDLE", info.dir().absolutePath());
+    }
+    // qDebug() << "# env" << env.toStringList();
     p.setProcessEnvironment(env);
 
     p.setProcessChannelMode(QProcess::ForwardedOutputChannel); // Forward stdout onto the main process
