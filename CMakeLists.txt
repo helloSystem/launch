@@ -18,6 +18,8 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
 add_executable(launch
   src/main.cpp
+  src/utils/finder.h
+  src/utils//finder.cpp
 )
 
 target_link_libraries(launch PRIVATE Qt5::Widgets)
