@@ -133,7 +133,7 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
         while (it.hasNext()) {
             QString filename = it.next();
             // qDebug() << "probono: Processing" << filename;
-            QString nameWithoutSuffix = QFileInfo(QDir(filename).canonicalPath()).baseName();
+            QString nameWithoutSuffix = QFileInfo(QDir(filename).canonicalPath()).completeBaseName();
             QFileInfo file(filename);
             if (file.fileName() == firstArg + ".app"){
                 QString AppCand = filename + "/" + nameWithoutSuffix;
