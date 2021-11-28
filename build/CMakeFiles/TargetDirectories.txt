@@ -1,8 +1,0 @@
-/home/user/helloSystem/launch/build/CMakeFiles/install/local.dir
-/home/user/helloSystem/launch/build/CMakeFiles/install/strip.dir
-/home/user/helloSystem/launch/build/CMakeFiles/launch.dir
-/home/user/helloSystem/launch/build/CMakeFiles/install.dir
-/home/user/helloSystem/launch/build/CMakeFiles/list_install_components.dir
-/home/user/helloSystem/launch/build/CMakeFiles/rebuild_cache.dir
-/home/user/helloSystem/launch/build/CMakeFiles/edit_cache.dir
-/home/user/helloSystem/launch/build/CMakeFiles/launch_autogen.dir
