@@ -254,7 +254,7 @@ int main(int argc, char *argv[])
             }
 
         }
-        else if (info.isExecutable()){
+        else if (info.isExecutable() && ! info.isDir()) {
             qDebug() << "# Found executable" << firstArg;
             executable = args.first();
         }
