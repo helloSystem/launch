@@ -75,7 +75,7 @@ QString getPackageUpdateCommand(QString pathToInstalledFile){
                 return QString("sudo pkg install %1").arg(rx.cap(1));
             }
         }
-    }
+   }
     // TODO: Implement the same for deb and rpm...
     // In all other cases, return a blank string
     return "";
@@ -155,6 +155,10 @@ QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList 
                 // .desktop file
                 qDebug() << "# Found" << file.fileName() << "TODO: Parse it for Exec=";
             }
+            else if (file.fileName() == firstArg + ".AppImage" || file.fileName() == firstArg + ".appimage") {
+                qDebug() << "# Found" << file.fileName();
+                candidates.append(filename);
+            } 
             else if (locationsContainingApps.contains(filename) == false && file.isDir() && filename.endsWith("/..") == false && filename.endsWith("/.") == false && filename.endsWith(".app") == false && filename.endsWith(".AppDir") == false) {
                 // Now we have a directory that is not an .app bundle nor an .AppDir
                 // Shall we descend into it? Only if it contains at least one application, to optimize for speed
@@ -258,6 +262,10 @@ int main(int argc, char *argv[])
             qDebug() << "# Found executable" << firstArg;
             executable = args.first();
         }
+        else if (firstArg.endsWith(".AppImage") || firstArg.endsWith(".appimage")) {
+            qDebug() << "# Found non-executable AppImage" << firstArg;
+            executable = args.first();
+        }
     }
 
     // Second, try to find an executable file on the $PATH
@@ -286,7 +294,7 @@ int main(int argc, char *argv[])
         // Iterate recursively through locationsContainingApps searching for AppRun files in matchingly named AppDirs
 
         QFileInfoList candidates;
-        QString firstArgWithoutWellKnownSuffix = firstArg.replace(".AppDir", "").replace(".app", "").replace(".desktop" ,"");
+        QString firstArgWithoutWellKnownSuffix = firstArg.replace(".AppDir", "").replace(".app", "").replace(".desktop" ,"").replace(".AppImage", "").replace(".appimage", "");
 
         candidates = findAppsInside(locationsContainingApps, candidates, firstArgWithoutWellKnownSuffix);
 
@@ -304,17 +312,26 @@ int main(int argc, char *argv[])
     }
 
     p.setProgram(executable);
-    args.pop_front();
-    p.setArguments(args);
+
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("LAUNCHED_EXECUTABLE", executable);
+    QFileInfo info = QFileInfo(executable);
+
+    args.pop_front();
+    qDebug() << "# executable:" << executable;
+    if (executable.endsWith(".AppImage") || executable.endsWith(".appimage")){
+        if (! info.isExecutable()) {
+            p.setProgram("runappimage");
+            args.insert(0, executable);
+        }
+    }
+    p.setArguments(args);
     // env.insert("QT_SCALE_FACTOR", "2");
 
     // Set LAUNCHED_EXECUTABLE and LAUNCHED_BUNDLE environment variables
     // On FreeBSD, can use
     // procstat -e $(xprop | grep PID | cut -d " " -f 3)
     // to get these for any given Xorg window
-    env.insert("LAUNCHED_EXECUTABLE", executable);
-    QFileInfo info = QFileInfo(executable);
     if ( info.dir().absolutePath().endsWith(".AppDir") || info.dir().absolutePath().endsWith(".app") ){
         // qDebug() << "# Bundle" << info.dir().absolutePath();
         env.insert("LAUNCHED_BUNDLE", info.dir().absolutePath());
@@ -323,7 +340,8 @@ int main(int argc, char *argv[])
     p.setProcessEnvironment(env);
 
     p.setProcessChannelMode(QProcess::ForwardedOutputChannel); // Forward stdout onto the main process
-
+    qDebug() << "# program:" << p.program();
+    qDebug() << "# args:" << args;
     p.start();
 
     // Blocks until process has started
