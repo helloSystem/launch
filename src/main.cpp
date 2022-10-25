@@ -12,6 +12,7 @@
 #include <QApplication>
 #include <QIcon>
 #include <QStyle>
+#include <QtDBus/QtDBus>
 
 /*
  * This tool handles four types of applications:
@@ -237,6 +238,10 @@ int main(int argc, char *argv[])
     // First, try to find something we can launch at the path,
     // either an executable or an .AppDir or an .app bundle
     firstArg = args.first();
+    QString nameWithoutSuffix;
+    QFileInfo fileInfo = QFileInfo(QDir(firstArg).canonicalPath());
+    nameWithoutSuffix = QFileInfo(fileInfo.completeBaseName()).fileName();
+
     if (QFile::exists(firstArg)){
         QFileInfo info = QFileInfo(firstArg);
         if ( firstArg.endsWith(".AppDir") || firstArg.endsWith(".app") ){
@@ -247,8 +252,6 @@ int main(int argc, char *argv[])
             }
             else {
                 // The .app could be a symlink, so we need to determine the nameWithoutSuffix from its target
-                QFileInfo fileInfo = QFileInfo(QDir(firstArg).canonicalPath());
-                QString nameWithoutSuffix = QFileInfo(fileInfo.completeBaseName()).fileName();
                 candidate = firstArg + "/" + nameWithoutSuffix;
             }
 
@@ -311,6 +314,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    // Proceed to launch application
     p.setProgram(executable);
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
@@ -346,8 +350,23 @@ int main(int argc, char *argv[])
 
     // Blocks until process has started
     if (!p.waitForStarted()) {
-        QMessageBox::warning( nullptr, firstArg, "Could not launch\n" + firstArg );
+        QMessageBox::warning( nullptr, firstArg, "Could not launch\n" + nameWithoutSuffix );
         return(1);
+    }
+
+    // Tell Menu that an application is being launched; except for Menu itself and for Filer
+    if ((nameWithoutSuffix != "Menu") && (nameWithoutSuffix != "Filer") && (QDBusConnection::sessionBus().isConnected())) {
+        QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
+        if (! iface.isValid()) {
+            printf("D-Bus interface not valid\n");
+        } else {
+            QDBusReply<QString> reply = iface.call("showApplicationName", nameWithoutSuffix);
+            if (! reply.isValid()) {
+                printf("D-Bus reply not valid\n");
+            } else {
+                printf("D-Bus reply: %s\n", qPrintable(reply.value()));
+            }
+        }
     }
 
     // TODO: Now would be a good time to signal the Dock to start showing a bouncing the icon of the
@@ -359,11 +378,29 @@ int main(int argc, char *argv[])
 
     if (p.state() == 0 and p.exitCode() != 0) {
         qDebug("Process is not running anymore and exit code was not 0");
-        const QString error = p.readAllStandardError();
-        if (!error.isEmpty()) {
-            qDebug() << error;
-            handleError(&p, error);
+        QString error = p.readAllStandardError();
+        if (error.isEmpty()) {
+            error = QString("%1 exited unexpectedly\nwith exit code %2").arg(nameWithoutSuffix).arg(p.exitCode());
         }
+
+        qDebug() << error;
+        handleError(&p, error);
+
+        // Tell Menu that an application is no more being launched
+        if ((nameWithoutSuffix != "Filer") && (QDBusConnection::sessionBus().isConnected())) {
+            QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
+            if (! iface.isValid()) {
+                printf("D-Bus interface not valid\n");
+            } else {
+                QDBusReply<QString> reply = iface.call("hideApplicationName");
+                if (! reply.isValid()) {
+                    printf("D-Bus reply not valid\n");
+                } else {
+                    printf("D-Bus reply: %s\n", qPrintable(reply.value()));
+                }
+            }
+        }
+
         return(p.exitCode());
     }
 
