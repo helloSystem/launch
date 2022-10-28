@@ -239,7 +239,12 @@ int main(int argc, char *argv[])
     // either an executable or an .AppDir or an .app bundle
     firstArg = args.first();
     QString nameWithoutSuffix;
-    QFileInfo fileInfo = QFileInfo(QDir(firstArg).canonicalPath());
+    QDir(firstArg).cleanPath(firstArg);
+    // Remove trailing slashes
+    while( firstArg.endsWith("/") ){
+        firstArg.remove(firstArg.length()-1,1);
+    }
+    QFileInfo fileInfo = QFileInfo(firstArg);
     nameWithoutSuffix = QFileInfo(fileInfo.completeBaseName()).fileName();
 
     if (QFile::exists(firstArg)){
