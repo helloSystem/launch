@@ -46,6 +46,27 @@ will also list all paths that are attempted.
 
 */
 
+// Borrowed from Filer:
+// Returns the name of the most nested bundle a file is in,
+// or an empty string if the file is not in a bundle
+QString bundlePath(QString path) {
+    if (path.endsWith(".app") || path.endsWith(".app/") || path.contains(".app/")) {
+        QStringList parts = path.split(".app");
+        parts.removeLast();
+        return parts.join(".app");
+    } else if (path.endsWith(".AppDir") || path.endsWith(".AppDir/") || path.contains(".AppDir/")) {
+        QStringList parts = path.split(".AppDir");
+        parts.removeLast();
+        return parts.join(".AppDir");
+    } else if (path.endsWith(".AppImage") || path.endsWith(".AppImage/")) {
+        return path;
+    } else {
+        return "";
+    }
+
+}
+
+
 class QDetachableProcess : public QProcess
 {
 public:
@@ -353,19 +374,30 @@ int main(int argc, char *argv[])
     qDebug() << "# args:" << args;
     p.start();
 
+
+    // Tell Menu that an application is being launched
+    QString bPath = bundlePath(p.program());
+    QString stringToBeDisplayed;
+    if (bPath != "") {
+        QFileInfo info = QFileInfo(bPath);
+        stringToBeDisplayed = info.fileName();
+    } else {
+        QFileInfo info = QFileInfo(p.program());
+        stringToBeDisplayed = info.fileName();
+    }
+
     // Blocks until process has started
     if (!p.waitForStarted()) {
-        QMessageBox::warning( nullptr, firstArg, "Could not launch\n" + nameWithoutSuffix );
+        QMessageBox::warning( nullptr, firstArg, "Could not launch\n" + stringToBeDisplayed );
         return(1);
     }
 
-    // Tell Menu that an application is being launched; except for Menu itself and for Filer
-    if ((nameWithoutSuffix != "Menu") && (nameWithoutSuffix != "Filer") && (QDBusConnection::sessionBus().isConnected())) {
+    if (QDBusConnection::sessionBus().isConnected()) {
         QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
         if (! iface.isValid()) {
             printf("D-Bus interface not valid\n");
         } else {
-            QDBusReply<QString> reply = iface.call("showApplicationName", nameWithoutSuffix);
+            QDBusReply<QString> reply = iface.call("showApplicationName", stringToBeDisplayed);
             if (! reply.isValid()) {
                 printf("D-Bus reply not valid\n");
             } else {
@@ -392,7 +424,7 @@ int main(int argc, char *argv[])
         handleError(&p, error);
 
         // Tell Menu that an application is no more being launched
-        if ((nameWithoutSuffix != "Filer") && (QDBusConnection::sessionBus().isConnected())) {
+        if (QDBusConnection::sessionBus().isConnected()) {
             QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
             if (! iface.isValid()) {
                 printf("D-Bus interface not valid\n");
