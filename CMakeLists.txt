@@ -11,6 +11,11 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Do not put qDebug() into Release builds
+if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
+    add_definitions(-DQT_NO_DEBUG_OUTPUT)
+endif()
+
 # probono: Set rpath
 set(CMAKE_INSTALL_RPATH $ORIGIN/../lib)
 

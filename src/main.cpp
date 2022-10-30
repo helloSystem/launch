@@ -397,20 +397,20 @@ int main(int argc, char *argv[])
 
     // Blocks until process has started
     if (!p.waitForStarted()) {
-        QMessageBox::warning( nullptr, firstArg, "Could not launch\n" + stringToBeDisplayed );
+        QMessageBox::warning( nullptr, firstArg, "Could not launch\n" + firstArg );
         return(1);
     }
 
     if (QDBusConnection::sessionBus().isConnected()) {
         QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
         if (! iface.isValid()) {
-            printf("D-Bus interface not valid\n");
+            qDebug() << "D-Bus interface not valid";
         } else {
             QDBusReply<QString> reply = iface.call("showApplicationName", stringToBeDisplayed);
             if (! reply.isValid()) {
-                printf("D-Bus reply not valid\n");
+                qDebug() << "D-Bus reply not valid";
             } else {
-                printf("D-Bus reply: %s\n", qPrintable(reply.value()));
+                qDebug() << QString("D-Bus reply: %1\n").arg(reply.value());
             }
         }
     }
@@ -436,13 +436,13 @@ int main(int argc, char *argv[])
         if (QDBusConnection::sessionBus().isConnected()) {
             QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
             if (! iface.isValid()) {
-                printf("D-Bus interface not valid\n");
+                qDebug() << "D-Bus interface not valid";
             } else {
                 QDBusReply<QString> reply = iface.call("hideApplicationName");
                 if (! reply.isValid()) {
-                    printf("D-Bus reply not valid\n");
+                    qDebug() << "D-Bus reply not valid";
                 } else {
-                    printf("D-Bus reply: %s\n", qPrintable(reply.value()));
+                    qDebug() << QString("D-Bus reply: %1\n").arg(reply.value());
                 }
             }
         }
