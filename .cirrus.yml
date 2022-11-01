@@ -11,11 +11,11 @@ task:
   auto_cancellation: false
   stateful: false
   setup_script:
-    - pkg install -y curl wget zip pkgconf cmake qt5-qmake qt5-widgets qt5-buildtools
+    - pkg install -y curl wget zip pkgconf cmake qt5-qmake qt5-widgets qt5-buildtools qt5-sql
   test_script:
     - mkdir build ; cd build
     - cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
     - make -j$(sysctl -n hw.ncpu)
-    - zip --symlinks -r launch_FreeBSD.zip launch
+    - zip --symlinks -r launch_FreeBSD.zip launch bundle-thumbnailer
     - case "$CIRRUS_BRANCH" in *pull/*) echo skipping since PR ;; * ) wget https://github.com/tcnksm/ghr/files/5247714/ghr.zip ; unzip ghr.zip ; rm ghr.zip ; ./ghr -delete -t "${GITHUB_TOKEN}" -u "${CIRRUS_REPO_OWNER}" -r "${CIRRUS_REPO_NAME}" -c "${CIRRUS_CHANGE_IN_REPO}" continuous "${CIRRUS_WORKING_DIR}"/build/*zip ; esac
   only_if: $CIRRUS_TAG != 'continuous'
