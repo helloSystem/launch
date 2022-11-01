@@ -8,11 +8,13 @@
 #include <QDirIterator>
 #include <QTime>
 #include <QElapsedTimer>
-#include <QRegExpValidator>
+#include <QRegularExpressionValidator>
 #include <QApplication>
 #include <QIcon>
 #include <QStyle>
 #include <QtDBus/QtDBus>
+
+#include "dbmanager.h"
 
 /*
  * This tool handles four types of applications:
@@ -365,7 +367,6 @@ int main(int argc, char *argv[])
         }
     }
     p.setArguments(args);
-    // env.insert("QT_SCALE_FACTOR", "2");
 
     // Set LAUNCHED_EXECUTABLE and LAUNCHED_BUNDLE environment variables
     // On FreeBSD, can use
@@ -450,6 +451,20 @@ int main(int argc, char *argv[])
         }
 
         return(p.exitCode());
+    }
+
+    // When we have made it all the way to here, add our application to the launch.db
+    // TODO: Similarly, when we are trying to launch the bundle but it is not there anymore, then remove it from the launch.db
+    if(env.contains("LAUNCHED_BUNDLE")) {
+        QString canonicalPath = env.value("LAUNCHED_BUNDLE");
+        if (canonicalPath.endsWith(".app") || canonicalPath.endsWith(".AppDir") || canonicalPath.endsWith(".AppImage")) {
+            DbManager db;
+            if (! db.isOpen()) {
+                qDebug() << "Database is not open!";
+            } else {
+                db.handleApplication(canonicalPath);
+            }
+        }
     }
 
     // Crude workaround for https://github.com/helloSystem/launch/issues/4
