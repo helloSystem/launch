@@ -372,8 +372,8 @@ int main(int argc, char *argv[])
     // procstat -e $(xprop | grep PID | cut -d " " -f 3)
     // to get these for any given Xorg window
     if ( info.dir().absolutePath().endsWith(".AppDir") || info.dir().absolutePath().endsWith(".app") || info.dir().absolutePath().endsWith(".AppImage")){
-        // qDebug() << "# Bundle" << info.dir().absolutePath();
-        env.insert("LAUNCHED_BUNDLE", info.dir().absolutePath());
+        // qDebug() << "# Bundle" << info.dir().canonicalPath();
+        env.insert("LAUNCHED_BUNDLE", info.dir().canonicalPath()); // Resolve symlinks so as to show the real location
     } else {
         env.remove("LAUNCHED_BUNDLE"); // So that nested launches won't leak LAUNCHED_BUNDLE from parent to child application
     }
