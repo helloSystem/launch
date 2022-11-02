@@ -353,7 +353,8 @@ int main(int argc, char *argv[])
     // for the application to be launched, so as to not break opening documents with applications;
     // we can only hope that such applications are smart enough to open the supplied document
     // using an already-running process instance. This is clumsy; how to do it better?
-    if(argc < 3 && env.contains("LAUNCHED_BUNDLE")) {
+    // TODO: Remove Menu special case here as soon as we can bring up its Search box with D-Bus
+    if(argc < 3 && env.contains("LAUNCHED_BUNDLE") && (firstArg != "Menu")) {
         qDebug() << "# Checking for existing windows";
         const auto &windows = KWindowSystem::windows();
         ApplicationInfo *ai = new ApplicationInfo();
