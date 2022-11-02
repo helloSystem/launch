@@ -12,7 +12,7 @@ public:
     ~DbManager();
     void handleApplication(QString canonicalPath);
     bool isOpen() const;
-    void printAllApplications() const;
+    QStringList allApplications() const;
     bool removeAllApplications();
 
 private:

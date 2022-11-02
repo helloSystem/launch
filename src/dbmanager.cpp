@@ -67,10 +67,10 @@ void DbManager::handleApplication(QString path)
     {
         qDebug() << canonicalPath << "does not exist, removing from launch.db";
         _removeApplication(canonicalPath);
+    } else {
+        // qDebug() << "Adding" << canonicalPath << "to launch.db";
+        _addApplication(canonicalPath);
     }
-
-    qDebug() << "Adding" << canonicalPath << "to launch.db";
-    _addApplication(canonicalPath);
 }
 
 bool DbManager::_addApplication(const QString& path)
@@ -86,10 +86,6 @@ bool DbManager::_addApplication(const QString& path)
         if(queryAdd.exec())
         {
             success = true;
-        }
-        else
-        {
-            qDebug() << "add application failed: " << queryAdd.lastError();
         }
     }
     else
@@ -120,17 +116,17 @@ bool DbManager::_removeApplication(const QString& path)
     return success;
 }
 
-void DbManager::printAllApplications() const
+QStringList DbManager::allApplications() const
 {
+    QStringList results;
     QTextStream cout(stdout);
-    cout << _numberOfApplications() << " applications in db:\n";
     QSqlQuery query("SELECT * FROM applications");
     int idName = query.record().indexOf("path");
     while (query.next())
     {
-        QString path = query.value(idName).toString();
-        cout << path << "\n";
+        results.append(query.value(idName).toString());
     }
+    return results;
 }
 
 unsigned int DbManager::_numberOfApplications() const

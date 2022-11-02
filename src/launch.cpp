@@ -12,27 +12,48 @@
 #include <QApplication>
 #include <QIcon>
 #include <QStyle>
+#include <QTime>
 #include <QtDBus/QtDBus>
 
+#include <KF5/KWindowSystem/KWindowSystem>
+
 #include "dbmanager.h"
+#include "applicationinfo.h"
+#include "appdiscovery.h"
 
 /*
+ * All GUI applications shall be launched through this tool on helloDesktop
+ *
  * This tool handles four types of applications:
- * 1. Executables on the $PATH
- * 2. Simplified .app bundles (Convention: AppName.app/AppName is an executable) in well-known locations
- * 3. Simplified .AppDir directories (Convention: AppName[.AppDir]/AppRun is an executable) in well-known locations
- * 4. AppName.desktop files in well-known locations (TODO: Not implemented yet)
+ * 1. Executables
+ * 2. Simplified .app bundles (Convention: AppName.app/AppName is an executable)
+ * 3. Simplified .AppDir directories (Convention: AppName[.AppDir]/AppRun is an executable)
+ * 4. AppName.desktop files
+ *
+ * The applications are searched
+ * 1. At the path given as the first argument
+ * 2. On the $PATH
+ * 3. In launch.db
+ * 4. As a fallback, via Baloo? (not implemented yet)
+ *
+ * launch.db is populated
+ * 1. By this tool (currently each time it is invoked; could be optimized to: only if application is not found)
+ * 2. By the file manager when one looks at applications (can be implemented natively or using bundle-thumbnailer)
+ *
+ * If an application bundle is being launched that has existing windows and no arguments are passed in,
+ * the existing windows are brought to the front instead of starting a new process.
+ *
+ * The environment variable LAUNCHED_EXECUTABLE is populated, and for bundles, the LAUNCHED_BUNDLE
+ * environment variable is also polulated.
  *
  * Usage:
  * launch <application to be launched> [<arguments>]    Launch the specified application
- * launch -l                                            Print well-known locations for applications
 
-Similar to:
-https://github.com/probonopd/appwrapper
-and:
-GNUstep openapp
+Similar to https://github.com/probonopd/appwrapper and GNUstep openapp
 
-TODO: Make the behavior resemble /usr/local/GNUstep/System/Tools/openapp (a bash script)
+TODO:
+* Possibly optimize for launch speed by only populating launch.db if the application is not found
+* Make the behavior resemble /usr/local/GNUstep/System/Tools/openapp (a bash script)
 
 user@FreeBSD$ /usr/local/GNUstep/System/Tools/openapp --help
 usage: openapp [--find] [--debug] application [arguments...]
@@ -47,35 +68,6 @@ executable which would be executed, without actually executing it.  It
 will also list all paths that are attempted.
 
 */
-
-// Borrowed from Filer:
-// Returns the name of the most nested bundle a file is in,
-// or an empty string if the file is not in a bundle
-QString bundlePath(QString path) {
-    QDir(path).cleanPath(path);
-    // Remove trailing slashes
-    while( path.endsWith("/") ){
-        path.remove(path.length()-1,1);
-    }
-    if (path.endsWith(".app")) {
-        return path;
-    } else if (path.contains(".app/")) {
-        QStringList parts = path.split(".app");
-        parts.removeLast();
-        return parts.join(".app");
-    } else if (path.endsWith(".AppDir")) {
-        return path;
-    } else if ( path.contains(".AppDir/")) {
-        QStringList parts = path.split(".AppDir");
-        parts.removeLast();
-        return parts.join(".AppDir");
-    } else if (path.endsWith(".AppImage")) {
-        return path;
-    } else {
-        return "";
-    }
-
-}
 
 
 class QDetachableProcess : public QProcess
@@ -158,57 +150,63 @@ void handleError(QDetachableProcess *p, QString errorString){
     }
 }
 
-
-QFileInfoList findAppsInside(QStringList locationsContainingApps, QFileInfoList candidates, QString firstArg)
+// Find apps on well-known paths and put them into launch.db
+void discoverApplications()
 {
-    foreach (QString directory, locationsContainingApps) {
-        QDirIterator it(directory, QDirIterator::NoIteratorFlags);
-        while (it.hasNext()) {
-            QString filename = it.next();
-            // qDebug() << "probono: Processing" << filename;
-            QString nameWithoutSuffix = QFileInfo(QDir(filename).canonicalPath()).completeBaseName();
-            QFileInfo file(filename);
-            if (file.fileName() == firstArg + ".app"){
-                QString AppCand = filename + "/" + nameWithoutSuffix;
-                qDebug() << "################### Checking" << AppCand;
-                if(QFileInfo(AppCand).exists() == true){
-                    qDebug() << "# Found" << AppCand;
-                    candidates.append(AppCand);
-                }
+    // Measure the time it takes to look up candidates
+    QElapsedTimer timer;
+    timer.start();
+    AppDiscovery *ad = new AppDiscovery();
+    QStringList wellKnownLocs = ad->wellKnownApplicationLocations();
+    ad->findAppsInside(wellKnownLocs);
+    qDebug() << "Took" << timer.elapsed() << "milliseconds to discover applications and add them to launch.db, part of which was logging";
+    // ad->~AppDiscovery(); // FIXME: Doing this here would lead to a crash; why?
+}
+
+QString executableForBundleOrExecutablePath(QString bundleOrExecutablePath)
+{
+    QString executable = "";
+    if (QFile::exists(bundleOrExecutablePath)){
+        QFileInfo info = QFileInfo(bundleOrExecutablePath);
+        if ( bundleOrExecutablePath.endsWith(".AppDir") || bundleOrExecutablePath.endsWith(".app") ){
+            qDebug() << "# Found" << bundleOrExecutablePath;
+            QString executable_candidate;
+            if(bundleOrExecutablePath.endsWith(".AppDir")) {
+                executable_candidate = bundleOrExecutablePath + "/AppRun";
             }
-            else if (file.fileName() == firstArg + ".AppDir"){
-                QString AppCand = filename + "/" + "AppRun";
-                qDebug() << "################### Checking" << AppCand;
-                if(QFileInfo(AppCand).exists() == true){
-                    qDebug() << "# Found" << AppCand;
-                    candidates.append(AppCand);
-                }
+            else {
+                // The .app could be a symlink, so we need to determine the nameWithoutSuffix from its target
+                QString nameWithoutSuffix = QFileInfo(bundleOrExecutablePath).completeBaseName();
+                executable_candidate = bundleOrExecutablePath + "/" + nameWithoutSuffix;
             }
-            else if (file.fileName() == firstArg + ".desktop") {
-                // .desktop file
-                qDebug() << "# Found" << file.fileName() << "TODO: Parse it for Exec=";
+
+            QFileInfo candinfo = QFileInfo(executable_candidate);
+            if(candinfo.isExecutable()) {
+                executable = executable_candidate;
             }
-            else if (file.fileName() == firstArg + ".AppImage" || file.fileName() == firstArg + ".appimage") {
-                qDebug() << "# Found" << file.fileName();
-                candidates.append(filename);
-            } 
-            else if (locationsContainingApps.contains(filename) == false && file.isDir() && filename.endsWith("/..") == false && filename.endsWith("/.") == false && filename.endsWith(".app") == false && filename.endsWith(".AppDir") == false) {
-                // Now we have a directory that is not an .app bundle nor an .AppDir
-                // Shall we descend into it? Only if it contains at least one application, to optimize for speed
-                // by not descending into directory trees that do not contain any applications at all. Can make
-                // a big difference.
-                QStringList nameFilter({"*.app", "*.AppDir", "*.desktop"});
-                QDir directory(filename);
-                int numberOfAppsInDirectory = directory.entryList(nameFilter).length();
-                if(numberOfAppsInDirectory > 0) {
-                    qDebug() << "# Descending into" << filename;
-                    QStringList locationsToBeChecked = {filename};
-                    candidates = findAppsInside(locationsToBeChecked, candidates, firstArg);
-                }
-            }
+
+        }
+        else if (info.isExecutable() && ! info.isDir()) {
+            qDebug() << "# Found executable" << bundleOrExecutablePath;
+            executable = bundleOrExecutablePath;
+        }
+        else if (bundleOrExecutablePath.endsWith(".AppImage") || bundleOrExecutablePath.endsWith(".appimage")) {
+            qDebug() << "# Found non-executable AppImage" << bundleOrExecutablePath;
+            executable = bundleOrExecutablePath;
+        }
+        else if (bundleOrExecutablePath.endsWith(".desktop")) {
+            qCritical() << "TODO: Implement .desktop parsing here";
+            QMessageBox::warning(nullptr, QFileInfo(bundleOrExecutablePath).completeBaseName(), "Launching .desktop files is not supported yet\n" + bundleOrExecutablePath );
+            exit(1);
         }
     }
-    return candidates;
+    return executable;
+}
+
+QString pathWithoutBundleSuffix(QString path)
+{
+    // FIXME: This is very lazy; TODO: Do it properly
+    return path.replace(".AppDir", "").replace(".app", "").replace(".desktop" ,"").replace(".AppImage", "").replace(".appimage", "");
 }
 
 int main(int argc, char *argv[])
@@ -227,85 +225,37 @@ int main(int argc, char *argv[])
 
     args.pop_front();
 
-    QStringList locationsContainingApps = {};
+    discoverApplications();
 
-    // Add some location in $HOME
-    locationsContainingApps.append(QDir::homePath() + "/Applications");
-    locationsContainingApps.append(QDir::homePath() + "/bin");
-    locationsContainingApps.append(QDir::homePath() + "/.bin");
-
-    // Add system-wide locations
-    // TODO: Find a better and more complete way to specify the GNUstep ones
-    locationsContainingApps.append({"/Applications", "/System", "/Library",
-                                    "/usr/local/GNUstep/Local/Applications",
-                                    "/usr/local/GNUstep/System/Applications",
-                                    "/usr/GNUstep/Local/Applications",
-                                    "/usr/GNUstep/System/Applications"
-                                   });
-
-    // Add legacy locations for XDG compatibility
-    // On FreeBSD: "/home/user/.local/share/applications", "/usr/local/share/applications", "/usr/share/applications"
-    locationsContainingApps.append(QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation));
-
-    locationsContainingApps.removeDuplicates(); // Make unique
+// ############
 
     if(args.isEmpty()){
-        qDebug() << "USAGE:" << argv[0] << "<application to be launched> [<arguments>]" ;
+        qCritical() << "USAGE:" << argv[0] << "<application to be launched> [<arguments>]" ;
         exit(1);
-    }
-
-    if(args[0] == "-l") {
-        args.pop_front();
-        qDebug() << locationsContainingApps;
-        exit(0);
     }
 
     QDetachableProcess p;
 
-    // Check whether the first argument exists or is on the $PATH
-
     QString executable = nullptr;
-    QString firstArg = nullptr;
+    QString firstArg = args.first();
+    QFileInfo fileInfo = QFileInfo(firstArg);
+    QString nameWithoutSuffix = QFileInfo(fileInfo.completeBaseName()).fileName();
 
-    // First, try to find something we can launch at the path,
-    // either an executable or an .AppDir or an .app bundle
-    firstArg = args.first();
-    QString nameWithoutSuffix;
-    QDir(firstArg).cleanPath(firstArg);
     // Remove trailing slashes
     while( firstArg.endsWith("/") ){
         firstArg.remove(firstArg.length()-1,1);
     }
-    QFileInfo fileInfo = QFileInfo(firstArg);
-    nameWithoutSuffix = QFileInfo(fileInfo.completeBaseName()).fileName();
 
-    if (QFile::exists(firstArg)){
-        QFileInfo info = QFileInfo(firstArg);
-        if ( firstArg.endsWith(".AppDir") || firstArg.endsWith(".app") ){
-            qDebug() << "# Found" << firstArg;
-            QString candidate;
-            if(firstArg.endsWith(".AppDir")) {
-                candidate = firstArg + "/AppRun";
-            }
-            else {
-                // The .app could be a symlink, so we need to determine the nameWithoutSuffix from its target
-                candidate = firstArg + "/" + nameWithoutSuffix;
-            }
+    // First, try to find something we can launch at the path that was supplied as an argument,
+    // Examples:
+    //    /Applications/LibreOffice.app
+    //    /Applications/LibreOffice.AppDir
+    //    /Applications/LibreOffice.AppImage
+    //    /Applications/libreoffice
 
-            QFileInfo candinfo = QFileInfo(candidate);
-            if(candinfo.isExecutable()) {
-                executable = candidate;
-            }
-
-        }
-        else if (info.isExecutable() && ! info.isDir()) {
-            qDebug() << "# Found executable" << firstArg;
-            executable = args.first();
-        }
-        else if (firstArg.endsWith(".AppImage") || firstArg.endsWith(".appimage")) {
-            qDebug() << "# Found non-executable AppImage" << firstArg;
-            executable = args.first();
-        }
+    executable = executableForBundleOrExecutablePath(firstArg);
+    if(executable != nullptr){
+        qDebug() << "Found" << firstArg << "at the path given as argument";
     }
 
     // Second, try to find an executable file on the $PATH
@@ -317,14 +267,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Third, if still not found, then try other means of location
-    // the preferred instance of the requested application, e.g., from a list of
-    // directories that hold .desktop files, .app bundles, .AppDir directories, or from a database.
-    // What follows is a very simplistic implementation, one could become much fancier for this.
-    // NOTE: For performance reasons, try to limit the launchable strings to
-    // what can be derived from file/directory names, so that we do not have to parse
-    // the contents of many desktop files, plist files, etc. here. If we were using a database,
-    // this restriction could be removed.
+    // Third, try to find an executable from the applications in launch.db
+
+    DbManager *db = new DbManager();
+
     if(executable == nullptr) {
 
         // Measure the time it takes to look up candidates
@@ -334,20 +280,31 @@ int main(int argc, char *argv[])
         // Iterate recursively through locationsContainingApps searching for AppRun files in matchingly named AppDirs
 
         QFileInfoList candidates;
-        QString firstArgWithoutWellKnownSuffix = firstArg.replace(".AppDir", "").replace(".app", "").replace(".desktop" ,"").replace(".AppImage", "").replace(".appimage", "");
 
-        candidates = findAppsInside(locationsContainingApps, candidates, firstArgWithoutWellKnownSuffix);
+        QStringList allAppsFromDb = db->allApplications();
 
-        qDebug() << "Took" << timer.elapsed() << "milliseconds to find candidates via the filesystem";
-        qDebug() << "Candidates:" << candidates;
-
-        foreach (QFileInfo candidate, candidates) {
+        QString selectedBundle = "";
+        for (QString appBundleCandidate : allAppsFromDb) {
             // Now that we may have collected different candidates, decide on which one to use
-            // e.g., the one with the highest self-declared version number. Again, a database might come in handy here
+            // e.g., the one with the highest self-declared version number.
+            // Also we need to check whether the appBundleCandidate exist
             // For now, just use the first one
-            qDebug() << "Selected candidate:" << candidate.absoluteFilePath();
-            executable = candidate.absoluteFilePath();
-            break;
+            if ( pathWithoutBundleSuffix(appBundleCandidate).endsWith(firstArg)) {
+                if(QFileInfo(appBundleCandidate).exists()) {
+                    qDebug() << "Selected from launch.db:" << appBundleCandidate;
+                    selectedBundle = appBundleCandidate;
+                break;
+                } else {
+                    db->handleApplication(appBundleCandidate); // Remove from launch.db it if it does not exist
+                }
+            }
+        }
+        // For the selectedBundle, get the launchable executable
+        if(selectedBundle == ""){
+            QMessageBox::warning(nullptr, firstArg, "Could not find\n" + firstArg );
+            exit(1);
+        } else {
+            executable = executableForBundleOrExecutablePath(selectedBundle);
         }
     }
 
@@ -355,40 +312,85 @@ int main(int argc, char *argv[])
     p.setProgram(executable);
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    qDebug() << "# Setting LAUNCHED_EXECUTABLE environment variable to" << executable;
     env.insert("LAUNCHED_EXECUTABLE", executable);
     QFileInfo info = QFileInfo(executable);
 
     args.pop_front();
-    qDebug() << "# executable:" << executable;
+
+    // Hackish workaround; TODO: Replace by something cleaner
     if (executable.endsWith(".AppImage") || executable.endsWith(".appimage")){
         if (! info.isExecutable()) {
             p.setProgram("runappimage");
             args.insert(0, executable);
         }
     }
+
     p.setArguments(args);
 
-    // Set LAUNCHED_EXECUTABLE and LAUNCHED_BUNDLE environment variables
-    // On FreeBSD, can use
+    // Hint: LAUNCHED_EXECUTABLE and LAUNCHED_BUNDLE environment variables
+    // can be gotten from X11 windows on FreeBSD with
     // procstat -e $(xprop | grep PID | cut -d " " -f 3)
-    // to get these for any given Xorg window
-    if ( info.dir().absolutePath().endsWith(".AppDir") || info.dir().absolutePath().endsWith(".app") || info.dir().absolutePath().endsWith(".AppImage")){
-        // qDebug() << "# Bundle" << info.dir().canonicalPath();
+    if ( info.dir().absolutePath().endsWith(".AppDir") || info.dir().absolutePath().endsWith(".app") || info.dir().absolutePath().endsWith(".AppImage") || info.dir().absolutePath().endsWith(".desktop")){
+        qDebug() << "# Bundle" << info.dir().canonicalPath();
+        qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to" << info.dir().canonicalPath();
         env.insert("LAUNCHED_BUNDLE", info.dir().canonicalPath()); // Resolve symlinks so as to show the real location
     } else {
-        env.remove("LAUNCHED_BUNDLE"); // So that nested launches won't leak LAUNCHED_BUNDLE from parent to child application
+        qDebug() << "# Unsetting LAUNCHED_BUNDLE environment variable";
+        env.remove("LAUNCHED_BUNDLE"); // So that nested launches won't leak LAUNCHED_BUNDLE from parent to child application; works
     }
     // qDebug() << "# env" << env.toStringList();
     p.setProcessEnvironment(env);
+    qDebug() << "#  p.processEnvironment():" << p.processEnvironment().toStringList();
 
     p.setProcessChannelMode(QProcess::ForwardedOutputChannel); // Forward stdout onto the main process
     qDebug() << "# program:" << p.program();
     qDebug() << "# args:" << args;
+
+    // If user launches an application bundle that has existing windows, bring those to the front
+    // instead of launching a second instance.
+    // FIXME: Currently we are doing this only if launch has been invoked without parameters
+    // for the application to be launched, so as to not break opening documents with applications;
+    // we can only hope that such applications are smart enough to open the supplied document
+    // using an already-running process instance. This is clumsy; how to do it better?
+    if(argc < 3 && env.contains("LAUNCHED_BUNDLE")) {
+        qDebug() << "# Checking for existing windows";
+        const auto &windows = KWindowSystem::windows();
+        ApplicationInfo *ai = new ApplicationInfo();
+        bool foundExistingWindow = false;
+        for (WId wid : windows) {
+            QString runningBundle = ai->bundlePathForWId(wid);
+            if(runningBundle == env.value("LAUNCHED_BUNDLE")) {
+                foundExistingWindow = true;
+                KWindowSystem::forceActiveWindow(wid);
+            }
+        }
+        if(foundExistingWindow) {
+            qDebug() << "# Activated existing windows instead of launching a new instance";
+
+            // We can't exit immediately or else te windows won't become active; FIXME: Do this properly
+            QTime dieTime= QTime::currentTime().addSecs(1);
+            while (QTime::currentTime() < dieTime)
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+            exit(0);
+        } else {
+            qDebug() << "# Did not find existing windows for LAUNCHED_BUNDLE" << env.value("LAUNCHED_BUNDLE");
+        }
+        ai->~ApplicationInfo();
+    } else if(argc < 3) {
+        qDebug() << "# Not checking for existing windows because arguments were passed to the application";
+    } else {
+        qDebug() << "# Not checking for existing windows";
+    }
+
+    // Start new process
     p.start();
 
-
     // Tell Menu that an application is being launched
-    QString bPath = bundlePath(p.program());
+    ApplicationInfo *ai = new ApplicationInfo();
+    QString bPath = ai->bundlePath(p.program());
+    ai->~ApplicationInfo();
     QString stringToBeDisplayed;
     if (bPath != "") {
         QFileInfo info = QFileInfo(bPath);
@@ -401,7 +403,7 @@ int main(int argc, char *argv[])
     // Blocks until process has started
     if (!p.waitForStarted()) {
         QMessageBox::warning( nullptr, firstArg, "Could not launch\n" + firstArg );
-        return(1);
+        exit(1);
     }
 
     if (QDBusConnection::sessionBus().isConnected()) {
@@ -417,9 +419,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-
-    // TODO: Now would be a good time to signal the Dock to start showing a bouncing the icon of the
-    // application that is being launched, until the application has its own icon in the Dock
 
     p.waitForFinished(3 * 1000); // Blocks until process has finished or timeout occured (x seconds)
     // Errors occuring thereafter will not be reported to the user in a message box anymore.
@@ -450,21 +449,13 @@ int main(int argc, char *argv[])
             }
         }
 
-        return(p.exitCode());
+        exit(p.exitCode());
     }
 
     // When we have made it all the way to here, add our application to the launch.db
     // TODO: Similarly, when we are trying to launch the bundle but it is not there anymore, then remove it from the launch.db
     if(env.contains("LAUNCHED_BUNDLE")) {
-        QString canonicalPath = env.value("LAUNCHED_BUNDLE");
-        if (canonicalPath.endsWith(".app") || canonicalPath.endsWith(".AppDir") || canonicalPath.endsWith(".AppImage")) {
-            DbManager db;
-            if (! db.isOpen()) {
-                qDebug() << "Database is not open!";
-            } else {
-                db.handleApplication(canonicalPath);
-            }
-        }
+            db->handleApplication(env.value("LAUNCHED_BUNDLE"));
     }
 
     // Crude workaround for https://github.com/helloSystem/launch/issues/4
@@ -473,5 +464,6 @@ int main(int argc, char *argv[])
 
     p.waitForFinished(-1);
 
+    return(0);
 }
 

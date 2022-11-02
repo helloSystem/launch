@@ -14,6 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # TODO: Make everything compile under Qt6
 find_package(QT NAMES Qt5 REQUIRED COMPONENTS Widgets DBus Core Sql)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets DBus Core Sql)
+find_package(KF5WindowSystem REQUIRED)
 
 # Do not put qDebug() into Release builds
 if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
@@ -27,6 +28,10 @@ add_executable(launch
   src/launch.cpp
   src/dbmanager.h
   src/dbmanager.cpp
+  src/applicationinfo.h
+  src/applicationinfo.cpp
+  src/appdiscovery.h
+  src/appdiscovery.cpp
 )
 
 add_executable(bundle-thumbnailer
@@ -35,7 +40,7 @@ add_executable(bundle-thumbnailer
   src/dbmanager.cpp
 )
 
-target_link_libraries(launch Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql)
+target_link_libraries(launch Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql KF5::WindowSystem procstat)
 
 target_link_libraries(bundle-thumbnailer Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Sql)
 

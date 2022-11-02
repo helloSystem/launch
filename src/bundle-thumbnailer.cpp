@@ -29,7 +29,9 @@ int main(int argc, char *argv[])
     }
 
     if(path == "-p") {
-        db.printAllApplications();
+        for (QString app : db.allApplications()) {
+            qWarning() << app;
+        }
         return 0;
     }
 
