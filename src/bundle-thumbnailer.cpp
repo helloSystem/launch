@@ -29,7 +29,8 @@ int main(int argc, char *argv[])
     }
 
     if(path == "-p") {
-        for (QString app : db.allApplications()) {
+        const QStringList allApps = db.allApplications();
+        for (QString app : allApps) {
             qWarning() << app;
         }
         return 0;

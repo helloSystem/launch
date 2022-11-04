@@ -32,6 +32,20 @@ add_executable(launch
   src/applicationinfo.cpp
   src/appdiscovery.h
   src/appdiscovery.cpp
+  src/extattrs.h
+  src/extattrs.cpp
+)
+
+add_executable(open
+  src/launch.cpp
+  src/dbmanager.h
+  src/dbmanager.cpp
+  src/applicationinfo.h
+  src/applicationinfo.cpp
+  src/appdiscovery.h
+  src/appdiscovery.cpp
+  src/extattrs.h
+  src/extattrs.cpp
 )
 
 add_executable(bundle-thumbnailer
@@ -42,8 +56,13 @@ add_executable(bundle-thumbnailer
 
 target_link_libraries(launch Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql KF5::WindowSystem procstat)
 
+target_link_libraries(open Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql KF5::WindowSystem procstat)
+
+ADD_CUSTOM_TARGET(link_target ALL
+                  COMMAND ${CMAKE_COMMAND} -E create_symlink launch open)
+
 target_link_libraries(bundle-thumbnailer Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Sql)
 
 # Allow for 'make install'
-install(TARGETS launch bundle-thumbnailer
+install(TARGETS launch open bundle-thumbnailer
         RUNTIME DESTINATION bin)

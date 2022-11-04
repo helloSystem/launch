@@ -20,9 +20,10 @@
 #include "dbmanager.h"
 #include "applicationinfo.h"
 #include "appdiscovery.h"
+#include "extattrs.h"
 
 /*
- * All GUI applications shall be launched through this tool on helloDesktop
+ * All documents shall be opened through this tool on helloDesktop
  *
  * This tool handles four types of applications:
  * 1. Executables
@@ -100,7 +101,7 @@ QString getPackageUpdateCommand(QString pathToInstalledFile){
                 return QString("sudo pkg install %1").arg(rx.cap(1));
             }
         }
-   }
+    }
     // TODO: Implement the same for deb and rpm...
     // In all other cases, return a blank string
     return "";
@@ -209,31 +210,9 @@ QString pathWithoutBundleSuffix(QString path)
     return path.replace(".AppDir", "").replace(".app", "").replace(".desktop" ,"").replace(".AppImage", "").replace(".appimage", "");
 }
 
-int main(int argc, char *argv[])
+
+int launch(QStringList args)
 {
-
-    QApplication app(argc, argv);
-
-    // Setting a busy cursor in this way seems only to affect the own application's windows
-    // rather than the full screen, which is why it is not suitable for this tool
-    // QApplication::setOverrideCursor(Qt::WaitCursor);
-
-    // Launch an application but initially watch for errors and display a Qt error message
-    // if needed. After some timeout, detach the process of the application, and exit this helper
-
-    QStringList args = app.arguments();
-
-    args.pop_front();
-
-    discoverApplications();
-
-// ############
-
-    if(args.isEmpty()){
-        qCritical() << "USAGE:" << argv[0] << "<application to be launched> [<arguments>]" ;
-        exit(1);
-    }
-
     QDetachableProcess p;
 
     QString executable = nullptr;
@@ -293,7 +272,7 @@ int main(int argc, char *argv[])
                 if(QFileInfo(appBundleCandidate).exists()) {
                     qDebug() << "Selected from launch.db:" << appBundleCandidate;
                     selectedBundle = appBundleCandidate;
-                break;
+                    break;
                 } else {
                     db->handleApplication(appBundleCandidate); // Remove from launch.db it if it does not exist
                 }
@@ -354,7 +333,7 @@ int main(int argc, char *argv[])
     // we can only hope that such applications are smart enough to open the supplied document
     // using an already-running process instance. This is clumsy; how to do it better?
     // TODO: Remove Menu special case here as soon as we can bring up its Search box with D-Bus
-    if(argc < 3 && env.contains("LAUNCHED_BUNDLE") && (firstArg != "Menu")) {
+    if(args.length() < 3 && env.contains("LAUNCHED_BUNDLE") && (firstArg != "Menu")) {
         qDebug() << "# Checking for existing windows";
         const auto &windows = KWindowSystem::windows();
         ApplicationInfo *ai = new ApplicationInfo();
@@ -379,7 +358,7 @@ int main(int argc, char *argv[])
             qDebug() << "# Did not find existing windows for LAUNCHED_BUNDLE" << env.value("LAUNCHED_BUNDLE");
         }
         ai->~ApplicationInfo();
-    } else if(argc < 3) {
+    } else if(args.length() < 3) {
         qDebug() << "# Not checking for existing windows because arguments were passed to the application";
     } else {
         qDebug() << "# Not checking for existing windows";
@@ -456,15 +435,111 @@ int main(int argc, char *argv[])
     // When we have made it all the way to here, add our application to the launch.db
     // TODO: Similarly, when we are trying to launch the bundle but it is not there anymore, then remove it from the launch.db
     if(env.contains("LAUNCHED_BUNDLE")) {
-            db->handleApplication(env.value("LAUNCHED_BUNDLE"));
+        db->handleApplication(env.value("LAUNCHED_BUNDLE"));
     }
 
     // Crude workaround for https://github.com/helloSystem/launch/issues/4
     // FIXME: Find a way to p.detach(); and return(0); without crashing the payload application
     // when it writes to stderr
-
+    db->~DbManager();
     p.waitForFinished(-1);
 
     return(0);
 }
 
+
+int open(const QString path)
+{
+    DbManager db;
+    if (! db.isOpen()) {
+        qCritical() << "xDatabase is not open!";
+        return 1;
+    }
+
+    QStringList removalCandidates = {};
+
+        if(! QFileInfo::exists(path)) {
+            QMessageBox::warning(nullptr, path, "Could not find\n" + path );
+            exit(1);
+        }
+
+        // Get MIME type of file to be opened
+        QString mimeType = QMimeDatabase().mimeTypeForFile(path).name();
+        qDebug() << "File to be opened has MIME type:" << mimeType;
+
+        QStringList appCandidates;
+        const QStringList allApps = db.allApplications();
+        for (const QString &app : allApps) {
+            bool ok;
+            QStringList canOpens = Fm::getAttributeValueQString(app, "can-open", ok).split(";");
+            if(! ok) {
+                removalCandidates.append(app);
+                continue;
+            }
+            for (const QString &canOpen : canOpens) {
+                if (canOpen == mimeType) {
+                    qDebug() << app << "can open" << canOpen;
+                    appCandidates.append(app);
+                }
+            }
+
+        }
+
+        // Garbage collect launch.db: Remove applications that are no longer on the filesystem
+        for (const QString removalCandidate : removalCandidates) {
+            db.handleApplication(removalCandidate);
+        }
+
+        qDebug() << "appCandidates:" << appCandidates;
+        if(appCandidates.length() < 1) {
+            QMessageBox::warning(nullptr, QFileInfo(path).fileName(),
+                                 "Found no application that can open\n" + QFileInfo(path).fileName() ); // TODO: Show "Open With" dialog?
+            return 1;
+        }
+
+        // TODO: Prioritize which of the applications that can handle this
+        // file should get to open it. For now we ust just the first one we find
+        // const QStringList arguments = QStringList({appCandidates[0], path});
+        launch({appCandidates[0], path});
+
+    return 0;
+}
+
+
+int main(int argc, char *argv[])
+{
+
+    QApplication app(argc, argv);
+
+    // Setting a busy cursor in this way seems only to affect the own application's windows
+    // rather than the full screen, which is why it is not suitable for this tool
+    // QApplication::setOverrideCursor(Qt::WaitCursor);
+
+    // Launch an application but initially watch for errors and display a Qt error message
+    // if needed. After some timeout, detach the process of the application, and exit this helper
+
+    QStringList args = app.arguments();
+
+    args.pop_front();
+
+    discoverApplications();
+
+    if(QFileInfo(argv[0]).fileName() == "launch") {
+        if(args.isEmpty()){
+            qCritical() << "USAGE:" << argv[0] << "<application to be launched> [<arguments>]" ;
+            exit(1);
+        }
+        launch(args);
+    }
+
+    if(QFileInfo(argv[0]).fileName() == "open") {
+        if(args.isEmpty()){
+            qCritical() << "USAGE:" << argv[0] << "<document to be opened>" ;
+            exit(1);
+        }
+        open(args.first());
+    }
+
+    return 0;
+
+}
