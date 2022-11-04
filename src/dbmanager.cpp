@@ -100,7 +100,7 @@ bool DbManager::_removeApplication(const QString& path)
 {
     bool success = false;
 
-    if (_applicationExists(path))
+    if (applicationExists(path))
     {
         QSqlQuery queryDelete;
         queryDelete.prepare("DELETE FROM applications WHERE path = (:path)");
@@ -139,7 +139,7 @@ unsigned int DbManager::_numberOfApplications() const
     }
 }
 
-bool DbManager::_applicationExists(const QString& path) const
+bool DbManager::applicationExists(const QString& path) const
 {
     bool exists = false;
 

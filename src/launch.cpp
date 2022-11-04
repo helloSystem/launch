@@ -448,7 +448,7 @@ int launch(QStringList args)
 }
 
 
-int open(const QString path)
+int open(const QString pathOfFileToBeOpened)
 {
     DbManager db;
     if (! db.isOpen()) {
@@ -456,21 +456,40 @@ int open(const QString path)
         return 1;
     }
 
-    QStringList removalCandidates = {};
+    QString appToBeLaunched = nullptr;
+    QStringList removalCandidates = {}; // For applications that possibly don't exist on disk anymore
 
-        if(! QFileInfo::exists(path)) {
-            QMessageBox::warning(nullptr, path, "Could not find\n" + path );
-            exit(1);
+    if(! QFileInfo::exists(pathOfFileToBeOpened)) {
+        QMessageBox::warning(nullptr, pathOfFileToBeOpened, "Could not find\n" + pathOfFileToBeOpened );
+        exit(1);
+    }
+
+    // Check whether the file to be opened specifies an application it wants to be opened with
+    bool ok = false;
+    QString openWith = Fm::getAttributeValueQString(pathOfFileToBeOpened, "open-with", ok);
+    if(ok) {
+        // NOTE: For security reasons, the application must be known to the system
+        // so that totally random commands won't get executed.
+        // Currently open-with needs to contain an absolute path
+        // contained in launch.db. This could
+        // possibly be made more sophisticated by allowing the open-with
+        // value to any kind of string that 'launch' knows to open;
+        // to be decided. Behavior might change in the future.
+        if(db.applicationExists(openWith)) {
+            appToBeLaunched = openWith;
         }
+    }
+
+    if (appToBeLaunched.isNull()) {
 
         // Get MIME type of file to be opened
-        QString mimeType = QMimeDatabase().mimeTypeForFile(path).name();
+        QString mimeType = QMimeDatabase().mimeTypeForFile(pathOfFileToBeOpened).name();
         qDebug() << "File to be opened has MIME type:" << mimeType;
 
         QStringList appCandidates;
         const QStringList allApps = db.allApplications();
         for (const QString &app : allApps) {
-            bool ok;
+            bool ok = false;
             QStringList canOpens = Fm::getAttributeValueQString(app, "can-open", ok).split(";");
             if(! ok) {
                 removalCandidates.append(app);
@@ -484,23 +503,27 @@ int open(const QString path)
             }
 
         }
-
-        // Garbage collect launch.db: Remove applications that are no longer on the filesystem
-        for (const QString removalCandidate : removalCandidates) {
-            db.handleApplication(removalCandidate);
-        }
-
         qDebug() << "appCandidates:" << appCandidates;
         if(appCandidates.length() < 1) {
-            QMessageBox::warning(nullptr, QFileInfo(path).fileName(),
-                                 "Found no application that can open\n" + QFileInfo(path).fileName() ); // TODO: Show "Open With" dialog?
+            QMessageBox::warning(nullptr, QFileInfo(pathOfFileToBeOpened).fileName(),
+                                 "Found no application that can open\n" + QFileInfo(pathOfFileToBeOpened).fileName() ); // TODO: Show "Open With" dialog?
             return 1;
+        } else {
+            appToBeLaunched = appCandidates[0];
         }
+    }
 
-        // TODO: Prioritize which of the applications that can handle this
-        // file should get to open it. For now we ust just the first one we find
-        // const QStringList arguments = QStringList({appCandidates[0], path});
-        launch({appCandidates[0], path});
+    // Garbage collect launch.db: Remove applications that are no longer on the filesystem
+    for (const QString removalCandidate : removalCandidates) {
+        db.handleApplication(removalCandidate);
+    }
+
+
+
+    // TODO: Prioritize which of the applications that can handle this
+    // file should get to open it. For now we ust just the first one we find
+    // const QStringList arguments = QStringList({appCandidates[0], path});
+    launch({appToBeLaunched, pathOfFileToBeOpened});
 
     return 0;
 }
