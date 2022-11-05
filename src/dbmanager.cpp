@@ -5,6 +5,9 @@
 #include <QDebug>
 #include <QDir>
 #include <QStandardPaths>
+#include <QSettings>
+
+#include "extattrs.h"
 
 DbManager::DbManager()
 {
@@ -70,6 +73,40 @@ void DbManager::handleApplication(QString path)
     } else {
         // qDebug() << "Adding" << canonicalPath << "to launch.db";
         _addApplication(canonicalPath);
+        // Set 'can-open' extattr if 'can-open' extattr doesn't already exist but 'can-open' file exists
+        if (canonicalPath.endsWith(".app")) {
+            bool ok = false;
+            Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
+            if(ok)
+                return; // extattr is already set
+            QString canOpenFilePath = canonicalPath + "/Resources/can-open";
+            if(!QFileInfo(canOpenFilePath).isFile()) return;
+            QFile f(canOpenFilePath);
+            if (! f.open(QFile::ReadOnly | QFile::Text))
+                return;
+            QTextStream in(&f);
+            ok = Fm::setAttributeValueQString(canonicalPath, "can-open", in.readAll());
+            if(ok) {
+                qDebug() << "Set xattr 'can-open' on" << canonicalPath;
+            } else {
+                qDebug() << "Cannot set xattr 'can-open' on" << canonicalPath;
+            }
+
+        }
+        else if (canonicalPath.endsWith(".desktop")) {
+            bool ok = false;
+            Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
+            if(ok)
+                return; // extattr is already set
+            QSettings desktopFile(canonicalPath, QSettings::IniFormat);
+            QString mime = desktopFile.value("Desktop Entry/MimeType").toString();
+            ok = Fm::setAttributeValueQString(canonicalPath, "can-open", mime);
+            if(ok) {
+                qDebug() << "Set xattr 'can-open' on" << canonicalPath;
+            } else {
+                qDebug() << "Cannot set xattr 'can-open' on" << canonicalPath;
+            }
+        }
     }
 }
 
@@ -116,15 +153,27 @@ bool DbManager::_removeApplication(const QString& path)
     return success;
 }
 
+// NOTE: Currently we are doing 2 SQL queries to ensure that .desktop files
+// are only being used as a last resort. Once we are more smart about prioritizing
+// which application candidate to use, we may want to reduce this to having just
+// one query here again
 QStringList DbManager::allApplications() const
 {
     QStringList results;
     QTextStream cout(stdout);
-    QSqlQuery query("SELECT * FROM applications");
+    // Prefer everything but .desktop files
+    QSqlQuery query("SELECT * FROM applications WHERE path NOT LIKE '%.desktop'");
     int idName = query.record().indexOf("path");
     while (query.next())
     {
         results.append(query.value(idName).toString());
+    }
+    // Fall back to .desktop files
+    QSqlQuery query2("SELECT * FROM applications WHERE path LIKE '%.desktop'");
+    int idName2 = query2.record().indexOf("path");
+    while (query2.next())
+    {
+        results.append(query2.value(idName2).toString());
     }
     return results;
 }

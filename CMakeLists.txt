@@ -52,6 +52,8 @@ add_executable(bundle-thumbnailer
   src/bundle-thumbnailer.cpp
   src/dbmanager.h
   src/dbmanager.cpp
+  src/extattrs.h
+  src/extattrs.cpp
 )
 
 target_link_libraries(launch Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql KF5::WindowSystem procstat)
