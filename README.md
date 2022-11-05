@@ -7,7 +7,7 @@ Command line tool to launch applications, will first search `$PATH` and then `.a
 On Alpine Linux:
 
 ```
-apk add --no-cache qt5-qtbase-dev kwindowsystem-dev git cmake alpine-sdk
+apk add --no-cache qt5-qtbase-dev kwindowsystem-dev git cmake musl-dev alpine-sdk clang
 ```
 
 ```shell
