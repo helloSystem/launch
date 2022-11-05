@@ -5,7 +5,6 @@
 #include <QDebug>
 #include <QDir>
 #include <QStandardPaths>
-#include <QSettings>
 
 #include "extattrs.h"
 
@@ -98,8 +97,26 @@ void DbManager::handleApplication(QString path)
             Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
             if(ok)
                 return; // extattr is already set
-            QSettings desktopFile(canonicalPath, QSettings::IniFormat);
-            QString mime = desktopFile.value("Desktop Entry/MimeType").toString();
+            // The following removes everything after a ';' which XDG loves to use
+            // even though they are comments in .ini files...
+            // QSettings desktopFile(canonicalPath, QSettings::IniFormat);
+            // QString mime = desktopFile.value("Desktop Entry/MimeType").toString();
+            // Hence we have to do it the hard way. Yet another example of why XDG is too complex
+            QFile f(canonicalPath);
+            QString mime = "";
+            f.open(QIODevice::ReadOnly | QIODevice::Text);
+            if(f.isOpen()){
+                QTextStream in(&f);
+                while(!in.atEnd()){
+                    QString getLine = in.readLine().trimmed();
+                    if(getLine.startsWith("MimeType=")){
+                        mime = getLine.remove(0, 9);
+                        continue;
+                    }
+                }
+            }
+            f.close();
+
             ok = Fm::setAttributeValueQString(canonicalPath, "can-open", mime);
             if(ok) {
                 qDebug() << "Set xattr 'can-open' on" << canonicalPath;
