@@ -193,7 +193,8 @@ QStringList executableForBundleOrExecutablePath(QString bundleOrExecutablePath)
         else if (bundleOrExecutablePath.endsWith(".desktop")) {
             qDebug() << "# Found .desktop file" << bundleOrExecutablePath;
             QSettings desktopFile(bundleOrExecutablePath, QSettings::IniFormat);
-            QStringList execStringAndArgs = desktopFile.value("Desktop Entry/Exec").toString().split(" ");
+            QString s = desktopFile.value("Desktop Entry/Exec").toString();
+            QStringList execStringAndArgs = QProcess::splitCommand(s); // This should hopefully treat quoted strings halfway correctly
             if(execStringAndArgs.first().count(QLatin1Char('\\')) > 0) {
                 QMessageBox::warning(nullptr, QFileInfo(bundleOrExecutablePath).completeBaseName(),
                                      "Launching such complex .desktop files is not supported yet.\n" + bundleOrExecutablePath );
