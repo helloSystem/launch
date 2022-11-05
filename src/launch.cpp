@@ -164,9 +164,9 @@ void discoverApplications()
     // ad->~AppDiscovery(); // FIXME: Doing this here would lead to a crash; why?
 }
 
-QString executableForBundleOrExecutablePath(QString bundleOrExecutablePath)
+QStringList executableForBundleOrExecutablePath(QString bundleOrExecutablePath)
 {
-    QString executable = "";
+    QStringList executableAndArgs = {};
     if (QFile::exists(bundleOrExecutablePath)){
         QFileInfo info = QFileInfo(bundleOrExecutablePath);
         if ( bundleOrExecutablePath.endsWith(".AppDir") || bundleOrExecutablePath.endsWith(".app") ){
@@ -183,25 +183,33 @@ QString executableForBundleOrExecutablePath(QString bundleOrExecutablePath)
 
             QFileInfo candinfo = QFileInfo(executable_candidate);
             if(candinfo.isExecutable()) {
-                executable = executable_candidate;
+                executableAndArgs = QStringList({executable_candidate});
             }
 
         }
-        else if (info.isExecutable() && ! info.isDir()) {
-            qDebug() << "# Found executable" << bundleOrExecutablePath;
-            executable = bundleOrExecutablePath;
-        }
         else if (bundleOrExecutablePath.endsWith(".AppImage") || bundleOrExecutablePath.endsWith(".appimage")) {
             qDebug() << "# Found non-executable AppImage" << bundleOrExecutablePath;
-            executable = bundleOrExecutablePath;
+            executableAndArgs = QStringList({bundleOrExecutablePath});
         }
         else if (bundleOrExecutablePath.endsWith(".desktop")) {
-            qCritical() << "TODO: Implement .desktop parsing here";
-            QMessageBox::warning(nullptr, QFileInfo(bundleOrExecutablePath).completeBaseName(), "Launching .desktop files is not supported yet\n" + bundleOrExecutablePath );
-            exit(1);
+            qDebug() << "# Found .desktop file" << bundleOrExecutablePath;
+            QSettings desktopFile(bundleOrExecutablePath, QSettings::IniFormat);
+            QStringList execStringAndArgs = desktopFile.value("Desktop Entry/Exec").toString().split(" ");
+            if(execStringAndArgs.first().count(QLatin1Char('\\')) > 0) {
+                QMessageBox::warning(nullptr, QFileInfo(bundleOrExecutablePath).completeBaseName(),
+                                     "Launching such complex .desktop files is not supported yet.\n" + bundleOrExecutablePath );
+                exit(1);
+            }
+            else {
+                executableAndArgs = execStringAndArgs;
+            }
+        }
+        else if (info.isExecutable() && ! info.isDir()) {
+            qDebug() << "# Found executable" << bundleOrExecutablePath;
+            executableAndArgs =  QStringList({bundleOrExecutablePath});
         }
     }
-    return executable;
+    return executableAndArgs;
 }
 
 QString pathWithoutBundleSuffix(QString path)
@@ -225,6 +233,8 @@ int launch(QStringList args)
         firstArg.remove(firstArg.length()-1,1);
     }
 
+    args.pop_front();
+
     // First, try to find something we can launch at the path that was supplied as an argument,
     // Examples:
     //    /Applications/LibreOffice.app
@@ -232,10 +242,7 @@ int launch(QStringList args)
     //    /Applications/LibreOffice.AppImage
     //    /Applications/libreoffice
 
-    executable = executableForBundleOrExecutablePath(firstArg);
-    if(executable != nullptr){
-        qDebug() << "Found" << firstArg << "at the path given as argument";
-    }
+    executable = executableForBundleOrExecutablePath(firstArg).first();
 
     // Second, try to find an executable file on the $PATH
     if(executable == nullptr){
@@ -263,6 +270,7 @@ int launch(QStringList args)
         QStringList allAppsFromDb = db->allApplications();
 
         QString selectedBundle = "";
+
         for (QString appBundleCandidate : allAppsFromDb) {
             // Now that we may have collected different candidates, decide on which one to use
             // e.g., the one with the highest self-declared version number.
@@ -278,13 +286,33 @@ int launch(QStringList args)
                 }
             }
         }
+
         // For the selectedBundle, get the launchable executable
         if(selectedBundle == ""){
             QMessageBox::warning(nullptr, firstArg, "Could not find\n" + firstArg );
             exit(1);
         } else {
-            executable = executableForBundleOrExecutablePath(selectedBundle);
+            executable = executableForBundleOrExecutablePath(selectedBundle).first();
         }
+    }
+
+    // .desktop files can have arguments in them, and we need to insert the arguments given
+    // to launch on the command line into the arguments coming from the desktop file.
+    // So we have to construct arguments from the desktop file and from the command line
+    // Things like this make XDG overly complex!
+    QStringList constructedArgs = {};
+    QStringList execLinePartsFromDesktopFile = executableForBundleOrExecutablePath(firstArg);
+    if(execLinePartsFromDesktopFile.length() > 1) {
+        execLinePartsFromDesktopFile.pop_front();
+        for(const QString execLinePartFromDesktopFile : execLinePartsFromDesktopFile) {
+            if(execLinePartFromDesktopFile == "%f"  || execLinePartFromDesktopFile == "%u")
+                constructedArgs.append(args[0]);
+            else if (execLinePartFromDesktopFile == "%F"  || execLinePartFromDesktopFile == "%U")
+                constructedArgs.append(args);
+            else
+                constructedArgs.append(execLinePartFromDesktopFile);
+        }
+        args = constructedArgs;
     }
 
     // Proceed to launch application
@@ -294,8 +322,6 @@ int launch(QStringList args)
     qDebug() << "# Setting LAUNCHED_EXECUTABLE environment variable to" << executable;
     env.insert("LAUNCHED_EXECUTABLE", executable);
     QFileInfo info = QFileInfo(executable);
-
-    args.pop_front();
 
     // Hackish workaround; TODO: Replace by something cleaner
     if (executable.endsWith(".AppImage") || executable.endsWith(".appimage")){
