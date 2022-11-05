@@ -512,12 +512,18 @@ int open(const QString pathOfFileToBeOpened)
         }
     }
 
+    QString mimeType;
     if (appToBeLaunched.isNull()) {
-
         // Get MIME type of file to be opened
-        QString mimeType = QMimeDatabase().mimeTypeForFile(pathOfFileToBeOpened).name();
+        mimeType = QMimeDatabase().mimeTypeForFile(pathOfFileToBeOpened).name();
         qDebug() << "File to be opened has MIME type:" << mimeType;
 
+        // Stop stealing applications (like code-oss) from claiming folders
+        if(mimeType == "inode/directory")
+            appToBeLaunched = "Filer";
+    }
+
+    if (appToBeLaunched.isNull()) {
         QStringList appCandidates;
         const QStringList allApps = db.allApplications();
         for (const QString &app : allApps) {
@@ -549,8 +555,6 @@ int open(const QString pathOfFileToBeOpened)
     for (const QString removalCandidate : removalCandidates) {
         db.handleApplication(removalCandidate);
     }
-
-
 
     // TODO: Prioritize which of the applications that can handle this
     // file should get to open it. For now we ust just the first one we find
