@@ -180,7 +180,6 @@ QStringList executableForBundleOrExecutablePath(QString bundleOrExecutablePath)
                 QString nameWithoutSuffix = QFileInfo(bundleOrExecutablePath).completeBaseName();
                 executable_candidate = bundleOrExecutablePath + "/" + nameWithoutSuffix;
             }
-
             QFileInfo candinfo = QFileInfo(executable_candidate);
             if(candinfo.isExecutable()) {
                 executableAndArgs = QStringList({executable_candidate});
@@ -221,6 +220,7 @@ QString pathWithoutBundleSuffix(QString path)
 
 int launch(QStringList args)
 {
+
     QDetachableProcess p;
 
     QString executable = nullptr;
@@ -242,7 +242,9 @@ int launch(QStringList args)
     //    /Applications/LibreOffice.AppImage
     //    /Applications/libreoffice
 
-    executable = executableForBundleOrExecutablePath(firstArg).first();
+    QStringList e = executableForBundleOrExecutablePath(firstArg);
+    if(e.length() > 0)
+        executable = e.first();
 
     // Second, try to find an executable file on the $PATH
     if(executable == nullptr){
@@ -292,7 +294,9 @@ int launch(QStringList args)
             QMessageBox::warning(nullptr, firstArg, "Could not find\n" + firstArg );
             exit(1);
         } else {
-            executable = executableForBundleOrExecutablePath(selectedBundle).first();
+            QStringList e = executableForBundleOrExecutablePath(selectedBundle);
+            if(e.length() > 0)
+                executable = e.first();
         }
     }
 
@@ -301,6 +305,7 @@ int launch(QStringList args)
     // So we have to construct arguments from the desktop file and from the command line
     // Things like this make XDG overly complex!
     QStringList constructedArgs = {};
+
     QStringList execLinePartsFromDesktopFile = executableForBundleOrExecutablePath(firstArg);
     if(execLinePartsFromDesktopFile.length() > 1) {
         execLinePartsFromDesktopFile.pop_front();
