@@ -3,14 +3,16 @@
 #include <sys/param.h> // for checking BSD definition
 #if defined(BSD)
 #include <sys/extattr.h>
-
-#include <QDebug>
-#include <QProcess>
-#include <QStandardPaths>
 #else
 #include <sys/types.h>
 #include <sys/xattr.h>
 #endif
+
+#include <QDebug>
+#include <QProcess>
+#include <QStandardPaths>
+
+#define XATTR_NAMESPACE "user"
 
 using namespace Fm;
 

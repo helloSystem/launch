@@ -56,9 +56,15 @@ add_executable(bundle-thumbnailer
   src/extattrs.cpp
 )
 
+if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 target_link_libraries(launch Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql KF5::WindowSystem procstat)
-
 target_link_libraries(open Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql KF5::WindowSystem procstat)
+endif()
+
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+target_link_libraries(launch Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql KF5::WindowSystem)
+target_link_libraries(open Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus Qt${QT_VERSION_MAJOR}::Sql KF5::WindowSystem)
+endif()
 
 ADD_CUSTOM_TARGET(link_target ALL
                   COMMAND ${CMAKE_COMMAND} -E create_symlink launch open)
