@@ -10,6 +10,7 @@
 
 DbManager::DbManager()
 {
+
     static const QString _databasePath = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/launch/launch.db");
 
     QDir dir(QFileInfo(_databasePath).dir());
@@ -29,10 +30,25 @@ DbManager::DbManager()
         // qDebug() << QString("Database %1: connection ok").arg(_databasePath);
         _createTable(); // Creates a table if it doesn't exist. Otherwise, it will use existing table.
     }
+
+    // In order to find out whether it is worth doing costly operations regarding
+    // extattrs we check whether the filesystem supports them and only use them if it does.
+    // This should help speed up things on Live ISOs where extattrs don't seem to be supported.
+
+    bool ok = false;
+    ok = Fm::setAttributeValueInt("/usr/local", "filesystemSupportsExtattr", true);
+    if(ok) {
+        _filesystemSupportsExtattr = true;
+        qCritical() << "Extended attributes are supported on /usr/local; using them";
+    } else {
+        qCritical() << "Extended attributes are not supported on /usr/local\n"
+                       "or the command to set them needs 'chmod +s'; system will be slower";
+    }
 }
 
 DbManager::~DbManager()
 {
+    _filesystemSupportsExtattr = false;
     if (m_db.isOpen())
     {
         m_db.close();
@@ -72,6 +88,8 @@ void DbManager::handleApplication(QString path)
     } else {
         // qDebug() << "Adding" << canonicalPath << "to launch.db";
         _addApplication(canonicalPath);
+
+/*
         // Set 'can-open' extattr if 'can-open' extattr doesn't already exist but 'can-open' file exists
         if (canonicalPath.endsWith(".app")) {
             bool ok = false;
@@ -124,6 +142,7 @@ void DbManager::handleApplication(QString path)
                 qDebug() << "Cannot set xattr 'can-open' on" << canonicalPath;
             }
         }
+        */
     }
 }
 

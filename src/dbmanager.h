@@ -21,7 +21,7 @@ private:
     bool _createTable();
     bool _addApplication(const QString& name);
     bool _removeApplication(const QString& name);
-
+    bool _filesystemSupportsExtattr;
     unsigned int _numberOfApplications() const;
     static const QString _databasePath;
 };
