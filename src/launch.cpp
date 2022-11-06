@@ -134,7 +134,6 @@ void handleError(QDetachableProcess *p, QString errorString){
         QFile f(outdatedLib);
         QFileInfo fileInfo(f.fileName());
         QString outdatedLibShort(fileInfo.fileName());
-        QString requiredBy = rx.cap(3);
         QString cleartextString = QString("This application requires at least version %2 of %1 to run.").arg(outdatedLibShort).arg(versionNeeded);
         if (getPackageUpdateCommand(outdatedLib) != "") {
             cleartextString.append(QString("\n\nPlease update it with\n%1\nand try again.").arg(getPackageUpdateCommand(outdatedLib)));
