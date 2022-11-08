@@ -524,6 +524,7 @@ int open(const QString pathOfFileToBeOpened)
 
     if (appToBeLaunched.isNull()) {
         QStringList appCandidates;
+        QStringList fallbackAppCandidates; // Those where only the first part of the MIME type before the "/" matches
         const QStringList allApps = db.allApplications();
         for (const QString &app : allApps) {
             bool ok = false;
@@ -537,10 +538,21 @@ int open(const QString pathOfFileToBeOpened)
                     qDebug() << app << "can open" << canOpen;
                     appCandidates.append(app);
                 }
+                if (canOpen.split("/").first() == mimeType.split("/").first()) {
+                    qDebug() << app << "can open" << canOpen.split("/").first();
+                    fallbackAppCandidates.append(app);
+                }
             }
 
         }
+
         qDebug() << "appCandidates:" << appCandidates;
+
+        if(appCandidates.length() < 1) {
+            qDebug() << "fallbackAppCandidates:" << fallbackAppCandidates;
+            appCandidates = fallbackAppCandidates;
+        }
+
         if(appCandidates.length() < 1) {
             QMessageBox::warning(nullptr, QFileInfo(pathOfFileToBeOpened).fileName(),
                                  "Found no application that can open\n" + QFileInfo(pathOfFileToBeOpened).fileName() ); // TODO: Show "Open With" dialog?
