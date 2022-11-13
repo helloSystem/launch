@@ -548,8 +548,9 @@ int open(const QStringList args)
         }
     }
 
-    QUrl url = QUrl(firstArg);
-    if(url.isValid()){
+
+    if(firstArg.contains(":/")){
+        QUrl url = QUrl(firstArg);
         qDebug() << "Protocol" << url.scheme();
         mimeType = "x-scheme-handler/" + url.scheme();
     }
