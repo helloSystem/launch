@@ -53,6 +53,8 @@ QString ApplicationInfo::bundlePath(QString path) {
         return parts.join(".AppDir");
     } else if (path.endsWith(".AppImage")) {
         return path;
+    } else if (path.endsWith(".desktop")) {
+        return path;
     } else {
         return "";
     }

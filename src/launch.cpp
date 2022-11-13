@@ -225,6 +225,8 @@ int launch(QStringList args)
 
     QString executable = nullptr;
     QString firstArg = args.first();
+    qDebug() << "launch firstArg:" << firstArg;
+
     QFileInfo fileInfo = QFileInfo(firstArg);
     QString nameWithoutSuffix = QFileInfo(fileInfo.completeBaseName()).fileName();
 
@@ -258,7 +260,7 @@ int launch(QStringList args)
     // Third, try to find an executable from the applications in launch.db
 
     DbManager *db = new DbManager();
-
+    QString selectedBundle = "";
     if(executable == nullptr) {
 
         // Measure the time it takes to look up candidates
@@ -271,7 +273,7 @@ int launch(QStringList args)
 
         QStringList allAppsFromDb = db->allApplications();
 
-        QString selectedBundle = "";
+
 
         for (QString appBundleCandidate : allAppsFromDb) {
             // Now that we may have collected different candidates, decide on which one to use
@@ -291,7 +293,7 @@ int launch(QStringList args)
 
         // For the selectedBundle, get the launchable executable
         if(selectedBundle == ""){
-            QMessageBox::warning(nullptr, " ", "Could not find\n" + firstArg );
+            QMessageBox::warning(nullptr, " ", "Cannot find\n" + firstArg );
             exit(1);
         } else {
             QStringList e = executableForBundleOrExecutablePath(selectedBundle);
@@ -329,7 +331,7 @@ int launch(QStringList args)
     QFileInfo info = QFileInfo(executable);
 
     // Hackish workaround; TODO: Replace by something cleaner
-    if (executable.endsWith(".AppImage") || executable.endsWith(".appimage")){
+    if (executable.toLower().endsWith(".appimage")){
         if (! info.isExecutable()) {
             p.setProgram("runappimage");
             args.insert(0, executable);
@@ -341,10 +343,20 @@ int launch(QStringList args)
     // Hint: LAUNCHED_EXECUTABLE and LAUNCHED_BUNDLE environment variables
     // can be gotten from X11 windows on FreeBSD with
     // procstat -e $(xprop | grep PID | cut -d " " -f 3)
-    if ( info.dir().absolutePath().endsWith(".AppDir") || info.dir().absolutePath().endsWith(".app") || info.dir().absolutePath().endsWith(".AppImage") || info.dir().absolutePath().endsWith(".desktop")){
-        qDebug() << "# Bundle" << info.dir().canonicalPath();
-        qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to" << info.dir().canonicalPath();
+    qDebug() << "info.canonicalFilePath():" << info.canonicalFilePath();
+    qDebug() << "executable:" << executable;
+    if (info.dir().absolutePath().toLower().endsWith(".appdir") || info.dir().absolutePath().toLower().endsWith(".app")){
+        qDebug() << "# Bundle directory (.app, .AppDir)" << info.dir().canonicalPath();
+        qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
         env.insert("LAUNCHED_BUNDLE", info.dir().canonicalPath()); // Resolve symlinks so as to show the real location
+    } else if (executable.toLower().endsWith(".appimage")){
+        qDebug() << "# Bundle file (.AppImage)" <<QFileInfo(executable).canonicalPath();
+        qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
+        env.insert("LAUNCHED_BUNDLE", QFileInfo(executable).canonicalPath()); // Resolve symlinks so as to show the real location
+    } else if (fileInfo.canonicalFilePath().endsWith(".desktop")){
+        qDebug() << "# Bundle file (.desktop)" << fileInfo.canonicalFilePath();
+        qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
+        env.insert("LAUNCHED_BUNDLE", fileInfo.canonicalFilePath()); // Resolve symlinks so as to show the real location
     } else {
         qDebug() << "# Unsetting LAUNCHED_BUNDLE environment variable";
         env.remove("LAUNCHED_BUNDLE"); // So that nested launches won't leak LAUNCHED_BUNDLE from parent to child application; works
@@ -402,31 +414,34 @@ int launch(QStringList args)
     ApplicationInfo *ai = new ApplicationInfo();
     QString bPath = ai->bundlePath(p.program());
     ai->~ApplicationInfo();
-    QString stringToBeDisplayed;
-    if (bPath != "") {
-        QFileInfo info = QFileInfo(bPath);
-        stringToBeDisplayed = info.fileName();
-    } else {
-        QFileInfo info = QFileInfo(p.program());
-        stringToBeDisplayed = info.fileName();
-    }
+
 
     // Blocks until process has started
     if (!p.waitForStarted()) {
-        QMessageBox::warning( nullptr, firstArg, "Could not launch\n" + firstArg );
+        QMessageBox::warning(nullptr, "", "Cannot launch\n" + firstArg );
         exit(1);
     }
 
-    if (QDBusConnection::sessionBus().isConnected()) {
-        QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
-        if (! iface.isValid()) {
-            qDebug() << "D-Bus interface not valid";
-        } else {
-            QDBusReply<QString> reply = iface.call("showApplicationName", stringToBeDisplayed);
-            if (! reply.isValid()) {
-                qDebug() << "D-Bus reply not valid";
+    if(env.value("LAUNCHED_BUNDLE") != ""){
+        QString stringToBeDisplayed = QFileInfo(env.value("LAUNCHED_BUNDLE")).completeBaseName();
+        // For desktop files, we need to parse them...
+        if(env.value("LAUNCHED_BUNDLE").endsWith(".desktop")) {
+            QSettings desktopFile(env.value("LAUNCHED_BUNDLE"), QSettings::IniFormat);
+            stringToBeDisplayed = desktopFile.value("Desktop Entry/Name").toString();
+        }
+
+
+        if (QDBusConnection::sessionBus().isConnected()) {
+            QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
+            if (! iface.isValid()) {
+                qDebug() << "D-Bus interface not valid";
             } else {
-                qDebug() << QString("D-Bus reply: %1\n").arg(reply.value());
+                QDBusReply<QString> reply = iface.call("showApplicationName", stringToBeDisplayed);
+                if (! reply.isValid()) {
+                    qDebug() << "D-Bus reply not valid";
+                } else {
+                    qDebug() << QString("D-Bus reply: %1\n").arg(reply.value());
+                }
             }
         }
     }
@@ -482,7 +497,7 @@ int launch(QStringList args)
 int open(const QStringList args)
 {
     QString firstArg = args.first();
-
+    qDebug() << "open firstArg:" << firstArg;
     DbManager db;
     if (! db.isOpen()) {
         qCritical() << "xDatabase is not open!";
@@ -493,7 +508,7 @@ int open(const QStringList args)
     QStringList removalCandidates = {}; // For applications that possibly don't exist on disk anymore
 
     if(! QFileInfo::exists(firstArg)) {
-        QMessageBox::warning(nullptr, " ", "Could not find\n" + firstArg );
+        QMessageBox::warning(nullptr, " ", "Cannot find\n" + firstArg );
         exit(1);
     }
 
