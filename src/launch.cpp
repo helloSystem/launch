@@ -13,6 +13,7 @@
 #include <QIcon>
 #include <QStyle>
 #include <QTime>
+#include <QUrl>
 #include <QtDBus/QtDBus>
 
 #include <KF5/KWindowSystem/KWindowSystem>
@@ -498,14 +499,14 @@ int open(const QStringList args)
     qDebug() << "open firstArg:" << firstArg;
     DbManager db;
     if (! db.isOpen()) {
-        qCritical() << "xDatabase is not open!";
+        qCritical() << "Database is not open!";
         return 1;
     }
 
     QString appToBeLaunched = nullptr;
     QStringList removalCandidates = {}; // For applications that possibly don't exist on disk anymore
 
-    if(! QFileInfo::exists(firstArg)) {
+    if((! QFileInfo::exists(firstArg)) && (! firstArg.contains(":/"))) {
         QMessageBox::warning(nullptr, " ", "Cannot find\n" + firstArg );
         exit(1);
     }
@@ -535,6 +536,22 @@ int open(const QStringList args)
         // Stop stealing applications (like code-oss) from claiming folders
         if(mimeType == "inode/directory")
             appToBeLaunched = "Filer";
+    }
+
+    // Do not attempt to open file types which are known to have no useful applications;
+    // please let us know if you have better ideas for what to do with those
+    QStringList blacklistedMimeTypes = {"application/octet-stream"};
+    for(const QString blacklistedMimeType : blacklistedMimeTypes) {
+        if((mimeType == blacklistedMimeType) && (! firstArg.contains(":/"))){
+            QMessageBox::warning(nullptr, " ", QString("Cannot open %1\nof MIME type '%2'").arg(firstArg, mimeType));
+            exit(1);
+        }
+    }
+
+    QUrl url = QUrl(firstArg);
+    if(url.isValid()){
+        qDebug() << "Protocol" << url.scheme();
+        mimeType = "x-scheme-handler/" + url.scheme();
     }
 
     if (appToBeLaunched.isNull()) {
@@ -617,7 +634,7 @@ int main(int argc, char *argv[])
         launch(args);
     }
 
-    if(QFileInfo(argv[0]).fileName() == "open") {
+    if(QFileInfo(argv[0]).fileName().endsWith("open")) {
         if(args.isEmpty()){
             qCritical() << "USAGE:" << argv[0] << "<document to be opened>" ;
             exit(1);
