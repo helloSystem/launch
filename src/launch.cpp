@@ -345,21 +345,19 @@ int launch(QStringList args)
     // procstat -e $(xprop | grep PID | cut -d " " -f 3)
     qDebug() << "info.canonicalFilePath():" << info.canonicalFilePath();
     qDebug() << "executable:" << executable;
+    env.remove("LAUNCHED_BUNDLE"); // So that nested launches won't leak LAUNCHED_BUNDLE from parent to child application; works
     if (info.dir().absolutePath().toLower().endsWith(".appdir") || info.dir().absolutePath().toLower().endsWith(".app")){
         qDebug() << "# Bundle directory (.app, .AppDir)" << info.dir().canonicalPath();
         qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
         env.insert("LAUNCHED_BUNDLE", info.dir().canonicalPath()); // Resolve symlinks so as to show the real location
-    } else if (executable.toLower().endsWith(".appimage")){
-        qDebug() << "# Bundle file (.AppImage)" <<QFileInfo(executable).canonicalPath();
+    } else if (fileInfo.canonicalFilePath().toLower().endsWith(".appimage")){
+        qDebug() << "# Bundle file (.AppImage)" << fileInfo.canonicalFilePath();
         qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
-        env.insert("LAUNCHED_BUNDLE", QFileInfo(executable).canonicalPath()); // Resolve symlinks so as to show the real location
+        env.insert("LAUNCHED_BUNDLE", fileInfo.canonicalFilePath()); // Resolve symlinks so as to show the real location
     } else if (fileInfo.canonicalFilePath().endsWith(".desktop")){
         qDebug() << "# Bundle file (.desktop)" << fileInfo.canonicalFilePath();
         qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
         env.insert("LAUNCHED_BUNDLE", fileInfo.canonicalFilePath()); // Resolve symlinks so as to show the real location
-    } else {
-        qDebug() << "# Unsetting LAUNCHED_BUNDLE environment variable";
-        env.remove("LAUNCHED_BUNDLE"); // So that nested launches won't leak LAUNCHED_BUNDLE from parent to child application; works
     }
     // qDebug() << "# env" << env.toStringList();
     p.setProcessEnvironment(env);
