@@ -34,17 +34,21 @@ If the application cannot be found, cannot be launched, or exits with a return c
 The following environment variables get set on the child process:
 
 **application** 
-: the path of an executable, the filename of an executable on the $PATH, the path of an application bundle (.app, .AppDir, .AppImage), or the name of an application bundle
+: the path of an executable, the filename of an executable on the $PATH, the path of an application bundle (.app, .AppDir, .AppImage), or the name of an application bundle.
 
 **arguments** 
-: passed through to the launched application
+: Arguments passed through to the launched application.
 
 # ENVIRONMENT
 **LAUNCHED_EXECUTABLE** 
-: The executable being executed, e.g., /System/Filer.app/Filer
+: The executable being executed, e.g., "/System/Filer.app/Filer".
 
 **LAUNCHED_BUNDLE** 
-: The executable being executed, e.g., /System/Filer.app
+: The executable being executed, e.g., "/System/Filer.app".
+
+# FILES
+**~/.local/share/launch/launch.db** 
+: The launch database that holds information about the applications known to the system.
 
 # EXAMPLES
 **launch FeatherPad**
@@ -68,8 +72,8 @@ The following environment variables get set on the child process:
 **launch /usr/local/bin/featherpad**
 : Launches an application from the path of an executable given as the first argument.
 
-# AUTHORS
-Written by Simon Peter for helloSystem.
+# SEE ALSO
+open(1)
 
 # BUGS
 Submit bug reports online at: <https://github.com/helloSystem/launch/issues>
@@ -77,3 +81,5 @@ Submit bug reports online at: <https://github.com/helloSystem/launch/issues>
 # SEE ALSO
 Full documentation and sources at: <https://github.com/helloSystem/launch>
 
+# AUTHORS
+Written by Simon Peter for helloSystem.
