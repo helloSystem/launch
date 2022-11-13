@@ -195,7 +195,7 @@ QStringList executableForBundleOrExecutablePath(QString bundleOrExecutablePath)
             QString s = desktopFile.value("Desktop Entry/Exec").toString();
             QStringList execStringAndArgs = QProcess::splitCommand(s); // This should hopefully treat quoted strings halfway correctly
             if(execStringAndArgs.first().count(QLatin1Char('\\')) > 0) {
-                QMessageBox::warning(nullptr, QFileInfo(bundleOrExecutablePath).completeBaseName(),
+                QMessageBox::warning(nullptr, " ",
                                      "Launching such complex .desktop files is not supported yet.\n" + bundleOrExecutablePath );
                 exit(1);
             }
@@ -291,7 +291,7 @@ int launch(QStringList args)
 
         // For the selectedBundle, get the launchable executable
         if(selectedBundle == ""){
-            QMessageBox::warning(nullptr, firstArg, "Could not find\n" + firstArg );
+            QMessageBox::warning(nullptr, " ", "Could not find\n" + firstArg );
             exit(1);
         } else {
             QStringList e = executableForBundleOrExecutablePath(selectedBundle);
@@ -479,8 +479,10 @@ int launch(QStringList args)
 }
 
 
-int open(const QString pathOfFileToBeOpened)
+int open(const QStringList args)
 {
+    QString firstArg = args.first();
+
     DbManager db;
     if (! db.isOpen()) {
         qCritical() << "xDatabase is not open!";
@@ -490,14 +492,14 @@ int open(const QString pathOfFileToBeOpened)
     QString appToBeLaunched = nullptr;
     QStringList removalCandidates = {}; // For applications that possibly don't exist on disk anymore
 
-    if(! QFileInfo::exists(pathOfFileToBeOpened)) {
-        QMessageBox::warning(nullptr, pathOfFileToBeOpened, "Could not find\n" + pathOfFileToBeOpened );
+    if(! QFileInfo::exists(firstArg)) {
+        QMessageBox::warning(nullptr, " ", "Could not find\n" + firstArg );
         exit(1);
     }
 
     // Check whether the file to be opened specifies an application it wants to be opened with
     bool ok = false;
-    QString openWith = Fm::getAttributeValueQString(pathOfFileToBeOpened, "open-with", ok);
+    QString openWith = Fm::getAttributeValueQString(firstArg, "open-with", ok);
     if(ok) {
         // NOTE: For security reasons, the application must be known to the system
         // so that totally random commands won't get executed.
@@ -514,7 +516,7 @@ int open(const QString pathOfFileToBeOpened)
     QString mimeType;
     if (appToBeLaunched.isNull()) {
         // Get MIME type of file to be opened
-        mimeType = QMimeDatabase().mimeTypeForFile(pathOfFileToBeOpened).name();
+        mimeType = QMimeDatabase().mimeTypeForFile(firstArg).name();
         qDebug() << "File to be opened has MIME type:" << mimeType;
 
         // Stop stealing applications (like code-oss) from claiming folders
@@ -554,8 +556,8 @@ int open(const QString pathOfFileToBeOpened)
         }
 
         if(appCandidates.length() < 1) {
-            QMessageBox::warning(nullptr, QFileInfo(pathOfFileToBeOpened).fileName(),
-                                 "Found no application that can open\n" + QFileInfo(pathOfFileToBeOpened).fileName() ); // TODO: Show "Open With" dialog?
+            QMessageBox::warning(nullptr, " ",
+                                 "Found no application that can open\n" + QFileInfo(firstArg).fileName() ); // TODO: Show "Open With" dialog?
             return 1;
         } else {
             appToBeLaunched = appCandidates[0];
@@ -570,7 +572,7 @@ int open(const QString pathOfFileToBeOpened)
     // TODO: Prioritize which of the applications that can handle this
     // file should get to open it. For now we ust just the first one we find
     // const QStringList arguments = QStringList({appCandidates[0], path});
-    launch({appToBeLaunched, pathOfFileToBeOpened});
+    launch({appToBeLaunched, firstArg});
 
     return 0;
 }
@@ -607,7 +609,7 @@ int main(int argc, char *argv[])
             qCritical() << "USAGE:" << argv[0] << "<document to be opened>" ;
             exit(1);
         }
-        open(args.first());
+        open(args);
     }
 
     return 0;
