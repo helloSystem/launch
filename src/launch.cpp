@@ -534,78 +534,88 @@ int open(const QStringList args)
         qDebug() << "File to be opened has MIME type:" << mimeType;
 
         // Stop stealing applications (like code-oss) from claiming folders
-        if(mimeType == "inode/directory")
+        if(mimeType.startsWith("inode/")){
             appToBeLaunched = "Filer";
-    }
-
-    // Do not attempt to open file types which are known to have no useful applications;
-    // please let us know if you have better ideas for what to do with those
-    QStringList blacklistedMimeTypes = {"application/octet-stream"};
-    for(const QString blacklistedMimeType : blacklistedMimeTypes) {
-        if((mimeType == blacklistedMimeType) && (! firstArg.contains(":/"))){
-            QMessageBox::warning(nullptr, " ", QString("Cannot open %1\nof MIME type '%2'").arg(firstArg, mimeType));
-            exit(1);
         }
-    }
+
+        // Handle legacy XDG style "computer:///LIVE.mount" mount points
+        // by converting them to sane "/media/LIVE". TODO: Get rid of them in Filer
+        if((firstArg.startsWith("computer://")) && (firstArg.endsWith(".mount"))) {
+            appToBeLaunched = "Filer";
+            firstArg.replace("computer://", "").replace(".mount", "");
+            firstArg = "/media" + firstArg;
+        }
 
 
-    if(firstArg.contains(":/")){
-        QUrl url = QUrl(firstArg);
-        qDebug() << "Protocol" << url.scheme();
-        mimeType = "x-scheme-handler/" + url.scheme();
-    }
-
-    if (appToBeLaunched.isNull()) {
-        QStringList appCandidates;
-        QStringList fallbackAppCandidates; // Those where only the first part of the MIME type before the "/" matches
-        const QStringList allApps = db.allApplications();
-        for (const QString &app : allApps) {
-            bool ok = false;
-            QStringList canOpens = Fm::getAttributeValueQString(app, "can-open", ok).split(";");
-            if(! ok) {
-                removalCandidates.append(app);
-                continue;
+        // Do not attempt to open file types which are known to have no useful applications;
+        // please let us know if you have better ideas for what to do with those
+        QStringList blacklistedMimeTypes = {"application/octet-stream"};
+        for(const QString blacklistedMimeType : blacklistedMimeTypes) {
+            if((mimeType == blacklistedMimeType) && (! firstArg.contains(":/"))){
+                QMessageBox::warning(nullptr, " ", QString("Cannot open %1\nof MIME type '%2'").arg(firstArg, mimeType));
+                exit(1);
             }
-            for (const QString &canOpen : canOpens) {
-                if (canOpen == mimeType) {
-                    qDebug() << app << "can open" << canOpen;
-                    appCandidates.append(app);
+        }
+
+
+        if(firstArg.contains(":/")){
+            QUrl url = QUrl(firstArg);
+            qDebug() << "Protocol" << url.scheme();
+            mimeType = "x-scheme-handler/" + url.scheme();
+        }
+
+        if (appToBeLaunched.isNull()) {
+            QStringList appCandidates;
+            QStringList fallbackAppCandidates; // Those where only the first part of the MIME type before the "/" matches
+            const QStringList allApps = db.allApplications();
+            for (const QString &app : allApps) {
+                bool ok = false;
+                QStringList canOpens = Fm::getAttributeValueQString(app, "can-open", ok).split(";");
+                if(! ok) {
+                    removalCandidates.append(app);
+                    continue;
                 }
-                if (canOpen.split("/").first() == mimeType.split("/").first()) {
-                    qDebug() << app << "can open" << canOpen.split("/").first();
-                    fallbackAppCandidates.append(app);
+                for (const QString &canOpen : canOpens) {
+                    if (canOpen == mimeType) {
+                        qDebug() << app << "can open" << canOpen;
+                        appCandidates.append(app);
+                    }
+                    if (canOpen.split("/").first() == mimeType.split("/").first()) {
+                        qDebug() << app << "can open" << canOpen.split("/").first();
+                        fallbackAppCandidates.append(app);
+                    }
                 }
+
             }
 
+            qDebug() << "appCandidates:" << appCandidates;
+
+            if(appCandidates.length() < 1) {
+                qDebug() << "fallbackAppCandidates:" << fallbackAppCandidates;
+                appCandidates = fallbackAppCandidates;
+            }
+
+            if(appCandidates.length() < 1) {
+                QMessageBox::warning(nullptr, " ",
+                                     "Found no application that can open\n" + QFileInfo(firstArg).fileName() ); // TODO: Show "Open With" dialog?
+                return 1;
+            } else {
+                appToBeLaunched = appCandidates[0];
+            }
         }
 
-        qDebug() << "appCandidates:" << appCandidates;
-
-        if(appCandidates.length() < 1) {
-            qDebug() << "fallbackAppCandidates:" << fallbackAppCandidates;
-            appCandidates = fallbackAppCandidates;
+        // Garbage collect launch.db: Remove applications that are no longer on the filesystem
+        for (const QString removalCandidate : removalCandidates) {
+            db.handleApplication(removalCandidate);
         }
 
-        if(appCandidates.length() < 1) {
-            QMessageBox::warning(nullptr, " ",
-                                 "Found no application that can open\n" + QFileInfo(firstArg).fileName() ); // TODO: Show "Open With" dialog?
-            return 1;
-        } else {
-            appToBeLaunched = appCandidates[0];
-        }
+        // TODO: Prioritize which of the applications that can handle this
+        // file should get to open it. For now we ust just the first one we find
+        // const QStringList arguments = QStringList({appCandidates[0], path});
+        launch({appToBeLaunched, firstArg});
+
+        return 0;
     }
-
-    // Garbage collect launch.db: Remove applications that are no longer on the filesystem
-    for (const QString removalCandidate : removalCandidates) {
-        db.handleApplication(removalCandidate);
-    }
-
-    // TODO: Prioritize which of the applications that can handle this
-    // file should get to open it. For now we ust just the first one we find
-    // const QStringList arguments = QStringList({appCandidates[0], path});
-    launch({appToBeLaunched, firstArg});
-
-    return 0;
 }
 
 
