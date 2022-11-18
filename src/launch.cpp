@@ -590,14 +590,21 @@ int open(const QStringList args)
 
             qDebug() << "appCandidates:" << appCandidates;
 
-            if(appCandidates.length() < 1) {
+            // Falling back to applications where only the first part of the MIME type before the "/" matches;
+            // this does not make sense for x-scheme-handler though
+            if((appCandidates.length() < 1) && (mimeType.split("/").first() != "x-scheme-handler")) {
                 qDebug() << "fallbackAppCandidates:" << fallbackAppCandidates;
                 appCandidates = fallbackAppCandidates;
             }
 
             if(appCandidates.length() < 1) {
+                QString fileOrProtocol = QFileInfo(firstArg).fileName();
+                if(firstArg.contains(":/")){
+                    QUrl url = QUrl(firstArg);
+                    fileOrProtocol = url.scheme() + "://";
+                }
                 QMessageBox::warning(nullptr, " ",
-                                     "Found no application that can open\n" + QFileInfo(firstArg).fileName() ); // TODO: Show "Open With" dialog?
+                                     "Found no application that can open\n" + fileOrProtocol ); // TODO: Show "Open With" dialog?
                 return 1;
             } else {
                 appToBeLaunched = appCandidates[0];
