@@ -538,7 +538,7 @@ int open(const QStringList args)
             appToBeLaunched = "Filer";
         }
 
-        // Handle legacy XDG style "file:///..." mount points
+        // Handle legacy XDG style "file:///..." URIs
         // by converting them to sane "/...". Example: Falkon downloads being double-clicked
         if(firstArg.startsWith("file://")) {
             firstArg = QUrl::fromEncoded(firstArg.toUtf8()).toString().replace("file://", "");
