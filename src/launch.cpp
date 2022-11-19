@@ -538,6 +538,12 @@ int open(const QStringList args)
             appToBeLaunched = "Filer";
         }
 
+        // Handle legacy XDG style "file:///..." mount points
+        // by converting them to sane "/...". Example: Falkon downloads being double-clicked
+        if(firstArg.startsWith("file://")) {
+            firstArg = QUrl::fromEncoded(firstArg.toUtf8()).toString().replace("file://", "");
+        }
+
         // Handle legacy XDG style "computer:///LIVE.mount" mount points
         // by converting them to sane "/media/LIVE". TODO: Get rid of them in Filer
         if((firstArg.startsWith("computer://")) && (firstArg.endsWith(".mount"))) {
