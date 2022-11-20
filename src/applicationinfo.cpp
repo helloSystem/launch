@@ -120,8 +120,8 @@ QString ApplicationInfo::bundlePathForPId(unsigned int pid) {
         procstat_close(prstat);
 
 #else
-        // Linux
-        qDebug() << "probono: TODO: Implement getting env";
+        // Linux; see Menu for a cross-platform solution?
+        qDebug() << "TODO: Implement getting env";
         path = "ThisIsOnlyImplementedForFreeBSDSoFar";
 #endif
 

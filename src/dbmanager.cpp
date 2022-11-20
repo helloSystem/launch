@@ -9,7 +9,23 @@
 #include "extattrs.h"
 
 DbManager::DbManager()
+    : filesystemSupportsExtattr(false)
 {
+
+    qDebug() << "DbManager::DbManager()";
+
+    // In order to find out whether it is worth doing costly operations regarding
+    // extattrs we check whether the filesystem supports them and only use them if it does.
+    // This should help speed up things on Live ISOs where extattrs don't seem to be supported.
+    bool ok = false;
+    ok = Fm::setAttributeValueInt("/usr", "filesystemSupportsExtattr", true);
+    if(ok) {
+        filesystemSupportsExtattr = true;
+        qCritical() << "Extended attributes are supported on /usr; using them";
+    } else {
+        qCritical() << "Extended attributes are not supported on /usr\n"
+                       "or the command to set them needs 'chmod +s'; system will be slower";
+    }
 
     static const QString _databasePath = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/launch/launch.db");
 
@@ -30,31 +46,15 @@ DbManager::DbManager()
         // qDebug() << QString("Database %1: connection ok").arg(_databasePath);
         _createTable(); // Creates a table if it doesn't exist. Otherwise, it will use existing table.
     }
-#ifdef FALSE
-    // FIXME: Why does this crash?
-    //
-    // In order to find out whether it is worth doing costly operations regarding
-    // extattrs we check whether the filesystem supports them and only use them if it does.
-    // This should help speed up things on Live ISOs where extattrs don't seem to be supported.
-    bool ok = false;
-    ok = Fm::setAttributeValueInt("/usr/local", "filesystemSupportsExtattr", true);
-    if(ok) {
-        _filesystemSupportsExtattr = true;
-        qCritical() << "Extended attributes are supported on /usr/local; using them";
-    } else {
-        qCritical() << "Extended attributes are not supported on /usr/local\n"
-                       "or the command to set them needs 'chmod +s'; system will be slower";
-    }
-#endif
 }
 
 DbManager::~DbManager()
 {
-    _filesystemSupportsExtattr = false;
     if (m_db.isOpen())
     {
         m_db.close();
     }
+    qDebug() << "DbManager::~DbManager()";
 }
 
 bool DbManager::isOpen() const
@@ -78,9 +78,56 @@ bool DbManager::_createTable()
     return success;
 }
 
+// Read "can-open" file and return its contents as a QString;
+// this is used e.g., when the system encounters application bundles
+// for the first time, or when the "open" command wants to open
+// documents but the filesystem doesn't support extended attributes
+// Returns nullptr if no "can-open" file is found in the application bundle
+QString DbManager::getCanOpenFromFile(QString canonicalPath) {
+    if (canonicalPath.endsWith(".app")) {
+        QString canOpenFilePath = canonicalPath + "/Resources/can-open";
+        if(!QFileInfo(canOpenFilePath).isFile())
+            return QString();
+        QFile f(canOpenFilePath);
+        if (! f.open(QFile::ReadOnly | QFile::Text))
+            return QString();
+        QTextStream in(&f);
+        return in.readAll();
+    }
+    else if (canonicalPath.endsWith(".desktop")) {
+        bool ok = false;
+        Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
+        if(ok)
+            return QString(); // extattr is already set
+        // The following removes everything after a ';' which XDG loves to use
+        // even though they are comments in .ini files...
+        // QSettings desktopFile(canonicalPath, QSettings::IniFormat);
+        // QString mime = desktopFile.value("Desktop Entry/MimeType").toString();
+        // Hence we have to do it the hard way. Yet another example of why XDG is too complex
+        QFile f(canonicalPath);
+        QString mime = "";
+        f.open(QIODevice::ReadOnly | QIODevice::Text);
+        if(f.isOpen()){
+            QTextStream in(&f);
+            while(!in.atEnd()){
+                QString getLine = in.readLine().trimmed();
+                if(getLine.startsWith("MimeType=")){
+                    mime = getLine.remove(0, 9);
+                    continue;
+                }
+            }
+        }
+        f.close();
+
+        return mime;
+    } else {
+        // TODO: AppDir
+        return QString();
+    }
+}
+
 void DbManager::handleApplication(QString path)
 {
-
     QString canonicalPath = QDir(path).canonicalPath();
 
     if(! (QFileInfo(canonicalPath).isDir() || QFileInfo(canonicalPath).isFile()))
@@ -90,61 +137,31 @@ void DbManager::handleApplication(QString path)
     } else {
         // qDebug() << "Adding" << canonicalPath << "to launch.db";
         _addApplication(canonicalPath);
+        // If extended attributes are not supported, there is nothing else to be done here
+        if(!filesystemSupportsExtattr){
+            return;
+        }
 
-#ifdef FALSE
         // Set 'can-open' extattr if 'can-open' extattr doesn't already exist but 'can-open' file exists
-        if (canonicalPath.endsWith(".app")) {
-            bool ok = false;
-            Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
-            if(ok)
-                return; // extattr is already set
-            QString canOpenFilePath = canonicalPath + "/Resources/can-open";
-            if(!QFileInfo(canOpenFilePath).isFile()) return;
-            QFile f(canOpenFilePath);
-            if (! f.open(QFile::ReadOnly | QFile::Text))
-                return;
-            QTextStream in(&f);
-            ok = Fm::setAttributeValueQString(canonicalPath, "can-open", in.readAll());
-            if(ok) {
-                qDebug() << "Set xattr 'can-open' on" << canonicalPath;
-            } else {
-                qDebug() << "Cannot set xattr 'can-open' on" << canonicalPath;
-            }
-
+        bool ok = false;
+        Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
+        if(ok)
+            return; // extattr is already set
+        QString mime = getCanOpenFromFile(canonicalPath);
+        if(mime.isEmpty()) {
+            qDebug() << "No 'can-open' file:" << canonicalPath;
+            return;
+        } else if(mime == "") {
+            qDebug() << "Empty 'can-open' file:" << canonicalPath;
+            return;
         }
-        else if (canonicalPath.endsWith(".desktop")) {
-            bool ok = false;
-            Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
-            if(ok)
-                return; // extattr is already set
-            // The following removes everything after a ';' which XDG loves to use
-            // even though they are comments in .ini files...
-            // QSettings desktopFile(canonicalPath, QSettings::IniFormat);
-            // QString mime = desktopFile.value("Desktop Entry/MimeType").toString();
-            // Hence we have to do it the hard way. Yet another example of why XDG is too complex
-            QFile f(canonicalPath);
-            QString mime = "";
-            f.open(QIODevice::ReadOnly | QIODevice::Text);
-            if(f.isOpen()){
-                QTextStream in(&f);
-                while(!in.atEnd()){
-                    QString getLine = in.readLine().trimmed();
-                    if(getLine.startsWith("MimeType=")){
-                        mime = getLine.remove(0, 9);
-                        continue;
-                    }
-                }
-            }
-            f.close();
-
-            ok = Fm::setAttributeValueQString(canonicalPath, "can-open", mime);
-            if(ok) {
-                qDebug() << "Set xattr 'can-open' on" << canonicalPath;
-            } else {
-                qDebug() << "Cannot set xattr 'can-open' on" << canonicalPath;
-            }
+        ok = Fm::setAttributeValueQString(canonicalPath, "can-open", mime);
+        if(ok) {
+            qDebug() << "Set xattr 'can-open' on" << canonicalPath;
+        } else {
+            qDebug() << "Cannot set xattr 'can-open' on" << canonicalPath;
         }
-#endif
+
     }
 }
 

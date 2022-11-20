@@ -7,15 +7,15 @@
 
 #include "dbmanager.h"
 
-AppDiscovery::AppDiscovery()
+AppDiscovery::AppDiscovery(DbManager *db)
 {
-    DbManager *db = new DbManager();
+ dbman = db;
 }
 
 
 AppDiscovery::~AppDiscovery()
 {
-    db->~DbManager();
+
 }
 
 QStringList AppDiscovery::wellKnownApplicationLocations()
@@ -69,22 +69,22 @@ void AppDiscovery::findAppsInside(QStringList locationsContainingApps)
         for(QString candidate : candidates ) {
             candidate = dir.path() + "/" + candidate;
             // Do not show Autostart directories (or should we?)
-            if (candidate.endsWith("/Autostart") == true) {
+            if((candidate.endsWith("/Autostart") == true) || (candidate.endsWith("/.") == true) || (candidate.endsWith("/..") == true)) {
                 continue;
             }
-            // qDebug() << "probono: Processing" << candidate;
+            qDebug() << "Processing" << candidate;
 
             if (candidate.endsWith(".app")){
-                db->handleApplication(candidate);
+                dbman->handleApplication(candidate);
             }
             else if (candidate.endsWith(".AppDir")) {
-                db->handleApplication(candidate);
+                dbman->handleApplication(candidate);
             }
             else if (candidate.endsWith(".desktop")) {
-                db->handleApplication(candidate);
+                dbman->handleApplication(candidate);
             }
             else if (candidate.endsWith(".AppImage") || candidate.endsWith(".appimage")) {
-                db->handleApplication(candidate);
+                dbman->handleApplication(candidate);
             }
             else if (locationsContainingApps.contains(candidate) == false && QFileInfo(candidate).isDir() && candidate.endsWith("/..") == false && candidate.endsWith("/.") == false && candidate.endsWith(".app") == false && candidate.endsWith(".AppDir") == false) {
                 // qDebug() << "# Found" << file.fileName() << ", a directory that is not an .app bundle nor an .AppDir";

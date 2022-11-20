@@ -9,13 +9,13 @@
 class AppDiscovery
 {
 public:
-    AppDiscovery();
+    AppDiscovery(DbManager *db);
     ~AppDiscovery();
     QStringList wellKnownApplicationLocations();
     void findAppsInside(QStringList locationsContainingApps);
 
 private:
-    DbManager *db;
+    DbManager *dbman;
 };
 
 #endif // APPDISCOVERY_H

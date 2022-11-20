@@ -71,6 +71,7 @@ will also list all paths that are attempted.
 
 */
 
+DbManager *db = new DbManager();
 
 class QDetachableProcess : public QProcess
 {
@@ -157,7 +158,7 @@ void discoverApplications()
     // Measure the time it takes to look up candidates
     QElapsedTimer timer;
     timer.start();
-    AppDiscovery *ad = new AppDiscovery();
+    AppDiscovery *ad = new AppDiscovery(db);
     QStringList wellKnownLocs = ad->wellKnownApplicationLocations();
     ad->findAppsInside(wellKnownLocs);
     qDebug() << "Took" << timer.elapsed() << "milliseconds to discover applications and add them to launch.db, part of which was logging";
@@ -221,7 +222,6 @@ QString pathWithoutBundleSuffix(QString path)
 
 int launch(QStringList args)
 {
-
     QDetachableProcess p;
 
     QString executable = nullptr;
@@ -260,7 +260,6 @@ int launch(QStringList args)
 
     // Third, try to find an executable from the applications in launch.db
 
-    DbManager *db = new DbManager();
     QString selectedBundle = "";
     if(executable == nullptr) {
 
@@ -273,8 +272,6 @@ int launch(QStringList args)
         QFileInfoList candidates;
 
         QStringList allAppsFromDb = db->allApplications();
-
-
 
         for (QString appBundleCandidate : allAppsFromDb) {
             // Now that we may have collected different candidates, decide on which one to use
@@ -414,7 +411,6 @@ int launch(QStringList args)
     QString bPath = ai->bundlePath(p.program());
     ai->~ApplicationInfo();
 
-
     // Blocks until process has started
     if (!p.waitForStarted()) {
         QMessageBox::warning(nullptr, "", "Cannot launch\n" + firstArg );
@@ -428,7 +424,6 @@ int launch(QStringList args)
             QSettings desktopFile(env.value("LAUNCHED_BUNDLE"), QSettings::IniFormat);
             stringToBeDisplayed = desktopFile.value("Desktop Entry/Name").toString();
         }
-
 
         if (QDBusConnection::sessionBus().isConnected()) {
             QDBusInterface iface("local.Menu", "/", "", QDBusConnection::sessionBus());
@@ -497,8 +492,8 @@ int open(const QStringList args)
 {
     QString firstArg = args.first();
     qDebug() << "open firstArg:" << firstArg;
-    DbManager db;
-    if (! db.isOpen()) {
+
+    if (! db->isOpen()) {
         qCritical() << "Database is not open!";
         return 1;
     }
@@ -522,7 +517,7 @@ int open(const QStringList args)
         // possibly be made more sophisticated by allowing the open-with
         // value to any kind of string that 'launch' knows to open;
         // to be decided. Behavior might change in the future.
-        if(db.applicationExists(openWith)) {
+        if(db->applicationExists(openWith)) {
             appToBeLaunched = openWith;
         }
     }
@@ -552,7 +547,6 @@ int open(const QStringList args)
             firstArg = "/media" + firstArg;
         }
 
-
         // Do not attempt to open file types which are known to have no useful applications;
         // please let us know if you have better ideas for what to do with those
         QStringList blacklistedMimeTypes = {"application/octet-stream"};
@@ -573,14 +567,21 @@ int open(const QStringList args)
         if (appToBeLaunched.isNull()) {
             QStringList appCandidates;
             QStringList fallbackAppCandidates; // Those where only the first part of the MIME type before the "/" matches
-            const QStringList allApps = db.allApplications();
+            const QStringList allApps = db->allApplications();
             for (const QString &app : allApps) {
-                bool ok = false;
-                QStringList canOpens = Fm::getAttributeValueQString(app, "can-open", ok).split(";");
-                if(! ok) {
-                    removalCandidates.append(app);
-                    continue;
+
+                QStringList canOpens;
+                if(db->filesystemSupportsExtattr) {
+                    bool ok = false;
+                    canOpens = Fm::getAttributeValueQString(app, "can-open", ok).split(";");
+                    if(! ok) {
+                        removalCandidates.append(app);
+                        continue;
+                    }
+                } else {
+                    canOpens = db->getCanOpenFromFile(app).split(";");
                 }
+
                 for (const QString &canOpen : canOpens) {
                     if (canOpen == mimeType) {
                         qDebug() << app << "can open" << canOpen;
@@ -619,16 +620,16 @@ int open(const QStringList args)
 
         // Garbage collect launch.db: Remove applications that are no longer on the filesystem
         for (const QString removalCandidate : removalCandidates) {
-            db.handleApplication(removalCandidate);
+            db->handleApplication(removalCandidate);
         }
 
         // TODO: Prioritize which of the applications that can handle this
         // file should get to open it. For now we ust just the first one we find
         // const QStringList arguments = QStringList({appCandidates[0], path});
         launch({appToBeLaunched, firstArg});
-
-        return 0;
     }
+    db->~DbManager();
+    return 0;
 }
 
 
