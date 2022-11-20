@@ -533,6 +533,12 @@ int open(const QStringList args)
             appToBeLaunched = "Filer";
         }
 
+        // Empty files are reported as 'application/x-zerosize' here, but as "inode/x-empty" by 'file'
+        // so treat them as empty text files; TODO: Better ideas, anyone?
+        if(mimeType == "application/x-zerosize" || mimeType == "inode/x-empty") {
+            mimeType = "text/plain";
+        }
+
         // Handle legacy XDG style "file:///..." URIs
         // by converting them to sane "/...". Example: Falkon downloads being double-clicked
         if(firstArg.startsWith("file://")) {
