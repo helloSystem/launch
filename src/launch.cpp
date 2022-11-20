@@ -611,7 +611,7 @@ int open(const QStringList args)
                     fileOrProtocol = url.scheme() + "://";
                 }
                 QMessageBox::warning(nullptr, " ",
-                                     "Found no application that can open\n" + fileOrProtocol ); // TODO: Show "Open With" dialog?
+                                     QString("Found no application that can open\n%1\nof type %2" ).arg(fileOrProtocol).arg(mimeType)); // TODO: Show "Open With" dialog?
                 return 1;
             } else {
                 appToBeLaunched = appCandidates[0];
