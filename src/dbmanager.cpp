@@ -21,9 +21,9 @@ DbManager::DbManager()
     ok = Fm::setAttributeValueInt("/usr", "filesystemSupportsExtattr", true);
     if(ok) {
         filesystemSupportsExtattr = true;
-        qCritical() << "Extended attributes are supported on /usr; using them";
+        qDebug() << "Extended attributes are supported on /usr; using them";
     } else {
-        qCritical() << "Extended attributes are not supported on /usr\n"
+        qDebug() << "Extended attributes are not supported on /usr\n"
                        "or the command to set them needs 'chmod +s'; system will be slower";
     }
 

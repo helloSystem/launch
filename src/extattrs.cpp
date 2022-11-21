@@ -115,7 +115,7 @@ bool setAttributeValueQString(const QString& path, const QString& attribute, con
     p.start();
     p.waitForFinished();
     if(p.exitCode() != 0) {
-        qCritical() << "Failed to run command:" << p.program() << p.arguments();
+        qDebug() << "Failed to run command:" << p.program() << p.arguments();
         return false;
     }
     return true;
