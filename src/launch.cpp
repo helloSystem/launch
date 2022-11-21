@@ -291,7 +291,7 @@ int launch(QStringList args)
 
         // For the selectedBundle, get the launchable executable
         if(selectedBundle == ""){
-            QMessageBox::warning(nullptr, " ", "Cannot find\n" + firstArg );
+            QMessageBox::warning(nullptr, " ", QString("The application '%1'\ncan't be launched because it can't be found.").arg(firstArg));
             exit(1);
         } else {
             QStringList e = executableForBundleOrExecutablePath(selectedBundle);
@@ -502,7 +502,14 @@ int open(const QStringList args)
     QStringList removalCandidates = {}; // For applications that possibly don't exist on disk anymore
 
     if((! QFileInfo::exists(firstArg)) && (! firstArg.contains(":/"))) {
-        QMessageBox::warning(nullptr, " ", "Cannot find\n" + firstArg );
+        if(QFileInfo(firstArg).isSymLink()) {
+            // Broken symlink
+            // TODO: Offer to delete or fix broken symlinks
+            QMessageBox::warning(nullptr, " ", QString("The symlink '%1'\ncan't be opened because\nthe target '%2'\ncan't be found.").arg(firstArg).arg(QFileInfo(firstArg).symLinkTarget()));
+        } else {
+            // File not found
+            QMessageBox::warning(nullptr, " ", QString("'%1'\ncan't be opened because it can't be found.").arg(firstArg));
+        }
         exit(1);
     }
 
@@ -558,7 +565,7 @@ int open(const QStringList args)
         QStringList blacklistedMimeTypes = {"application/octet-stream"};
         for(const QString blacklistedMimeType : blacklistedMimeTypes) {
             if((mimeType == blacklistedMimeType) && (! firstArg.contains(":/"))){
-                QMessageBox::warning(nullptr, " ", QString("Cannot open %1\nof MIME type '%2'").arg(firstArg, mimeType));
+                QMessageBox::warning(nullptr, " ", QString("Cannot open %1\nof MIME type '%2'.").arg(firstArg, mimeType));
                 exit(1);
             }
         }
@@ -617,7 +624,7 @@ int open(const QStringList args)
                     fileOrProtocol = url.scheme() + "://";
                 }
                 QMessageBox::warning(nullptr, " ",
-                                     QString("Found no application that can open\n%1\nof type %2" ).arg(fileOrProtocol).arg(mimeType)); // TODO: Show "Open With" dialog?
+                                     QString("Found no application that can open\n'%1'\nof type '%2'." ).arg(fileOrProtocol).arg(mimeType)); // TODO: Show "Open With" dialog?
                 return 1;
             } else {
                 appToBeLaunched = appCandidates[0];
