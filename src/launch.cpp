@@ -14,6 +14,14 @@
 #include <QStyle>
 #include <QTime>
 #include <QUrl>
+#include <QTableWidget>
+#include <QLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QListWidget>
+#include <QSizePolicy>
+#include <QDialogButtonBox>
+#include <QCheckBox>
 #include <QtDBus/QtDBus>
 
 #include <KF5/KWindowSystem/KWindowSystem>
@@ -535,6 +543,12 @@ int open(const QStringList args)
         mimeType = QMimeDatabase().mimeTypeForFile(firstArg).name();
         qDebug() << "File to be opened has MIME type:" << mimeType;
 
+        if(firstArg.contains(":/")){
+            QUrl url = QUrl(firstArg);
+            qDebug() << "Protocol" << url.scheme();
+            mimeType = "x-scheme-handler/" + url.scheme();
+        }
+
         // Stop stealing applications (like code-oss) from claiming folders
         if(mimeType.startsWith("inode/")){
             appToBeLaunched = "Filer";
@@ -568,13 +582,6 @@ int open(const QStringList args)
                 QMessageBox::warning(nullptr, " ", QString("Cannot open %1\nof MIME type '%2'.").arg(firstArg, mimeType));
                 exit(1);
             }
-        }
-
-
-        if(firstArg.contains(":/")){
-            QUrl url = QUrl(firstArg);
-            qDebug() << "Protocol" << url.scheme();
-            mimeType = "x-scheme-handler/" + url.scheme();
         }
 
         if (appToBeLaunched.isNull()) {
@@ -617,32 +624,90 @@ int open(const QStringList args)
                 appCandidates = fallbackAppCandidates;
             }
 
-            if(appCandidates.length() < 1) {
-                QString fileOrProtocol = QFileInfo(firstArg).fileName();
-                if(firstArg.contains(":/")){
-                    QUrl url = QUrl(firstArg);
-                    fileOrProtocol = url.scheme() + "://";
-                }
+            QString fileOrProtocol = QFileInfo(firstArg).fileName();
+            if(firstArg.contains(":/")){
+                QUrl url = QUrl(firstArg);
+                fileOrProtocol = url.scheme() + "://";
+            }
+
+            // Make unique, keeping order
+            QStringList uniqueAppCandidates = {};
+            for (const QString appCandidate : appCandidates) {
+                if(! uniqueAppCandidates.contains(appCandidate))
+                    uniqueAppCandidates.append(appCandidate);
+            }
+
+            if(uniqueAppCandidates.length() < 1) {
                 QMessageBox::warning(nullptr, " ",
                                      QString("Found no application that can open\n'%1'\nof type '%2'." ).arg(fileOrProtocol).arg(mimeType)); // TODO: Show "Open With" dialog?
                 return 1;
             } else {
-                appToBeLaunched = appCandidates[0];
+                if(uniqueAppCandidates.length() > 1) {
+/*
+                    QLabel label = QLabel(QString("Please choose an application to open \n'%1'\nof type '%2':" ).arg(fileOrProtocol).arg(mimeType));
+
+                    QDialog *dialog = new QDialog(nullptr);
+                    dialog->setWindowTitle(" ");
+
+                    QListWidget listWidget = QListWidget();
+                    listWidget.setAlternatingRowColors(true);
+                    for (auto r=0; r<uniqueAppCandidates.length(); r++) {
+                        QListWidgetItem *item = new QListWidgetItem(uniqueAppCandidates.at(r));
+                        listWidget.addItem(item);
+                        if(r==0)
+                            item->setSelected(true);
+                    }
+
+                    QVBoxLayout layout = QVBoxLayout();
+                    layout.addWidget(&label);
+                    layout.addWidget(&listWidget);
+
+                    QCheckBox rememberCheckbox = QCheckBox("Always open this document with this application");
+                    layout.addWidget(&rememberCheckbox);
+
+                    QCheckBox allDocsCheckbox = QCheckBox("Open all documents of this type with this application");
+                    layout.addWidget(&allDocsCheckbox);
+
+                    layout.addSpacing(22);
+
+                    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
+                                                         | QDialogButtonBox::Cancel);
+
+                    // This program is not a class, hence we don't have "this". How to do the following then?
+                    // connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+                    // connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+
+                    layout.addWidget(buttonBox);
+
+                    dialog->setLayout(&layout);
+                    dialog->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
+                    auto result = dialog->exec();
+                    qDebug() << "result:" << result;
+                    qDebug() << "User selected:" << listWidget.selectedItems().first()->text();
+                    appToBeLaunched = listWidget.selectedItems().first()->text();
+*/
+                    appToBeLaunched = uniqueAppCandidates[0];
+
+                } else {
+                    appToBeLaunched = uniqueAppCandidates[0];
+                }
+                qDebug() << "appToBeLaunched" << appToBeLaunched;
             }
         }
-
-        // Garbage collect launch.db: Remove applications that are no longer on the filesystem
-        for (const QString removalCandidate : removalCandidates) {
-            db->handleApplication(removalCandidate);
-        }
-
-        // TODO: Prioritize which of the applications that can handle this
-        // file should get to open it. For now we ust just the first one we find
-        // const QStringList arguments = QStringList({appCandidates[0], path});
-        launch({appToBeLaunched, firstArg});
     }
+    // Garbage collect launch.db: Remove applications that are no longer on the filesystem
+    for (const QString removalCandidate : removalCandidates) {
+        db->handleApplication(removalCandidate);
+    }
+
+    // TODO: Prioritize which of the applications that can handle this
+    // file should get to open it. For now we ust just the first one we find
+    // const QStringList arguments = QStringList({appCandidates[0], path});
+    launch({appToBeLaunched, firstArg});
+
     db->~DbManager();
     return 0;
+
 }
 
 
