@@ -38,6 +38,9 @@ add_executable(launch
   src/appdiscovery.cpp
   src/extattrs.h
   src/extattrs.cpp
+  src/launcher.h
+  src/launcher.cpp
+  src/applicationselectiondialog.h src/applicationselectiondialog.cpp src/applicationselectiondialog.ui
 )
 
 add_executable(open
@@ -50,6 +53,9 @@ add_executable(open
   src/appdiscovery.cpp
   src/extattrs.h
   src/extattrs.cpp
+  src/launcher.h
+  src/launcher.cpp
+  src/applicationselectiondialog.h src/applicationselectiondialog.cpp src/applicationselectiondialog.ui
 )
 
 add_executable(xdg-open
@@ -62,6 +68,9 @@ add_executable(xdg-open
   src/appdiscovery.cpp
   src/extattrs.h
   src/extattrs.cpp
+  src/launcher.h
+  src/launcher.cpp
+  src/applicationselectiondialog.h src/applicationselectiondialog.cpp src/applicationselectiondialog.ui
 )
 
 add_executable(bundle-thumbnailer
