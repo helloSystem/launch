@@ -428,8 +428,14 @@ int Launcher::launch(QStringList args)
 
 
 
-int Launcher::open(const QStringList args)
+int Launcher::open(QStringList args)
 {
+
+    bool showChooserRequested = false;
+    if(args.first() == "--chooser" ) {
+        args.pop_front();
+        showChooserRequested = true;
+    }
 
     QString firstArg = args.first();
     qDebug() << "open firstArg:" << firstArg;
@@ -571,12 +577,20 @@ int Launcher::open(const QStringList args)
                                      QString("Found no application that can open\n'%1'\nof type '%2'." ).arg(fileOrProtocol).arg(mimeType)); // TODO: Show "Open With" dialog?
                 return 1;
             } else {
-                if(appCandidates.length() > 1) {
-                    QString selectedApplication;
-                    ApplicationSelectionDialog *dlg = new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, &appCandidates, selectedApplication, nullptr);
-                    dlg->exec();
-                    appToBeLaunched = dlg->getSelectedApplication();
-
+                if(showChooserRequested) {
+                    ApplicationSelectionDialog *dlg = new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, &appCandidates, true, nullptr);
+                    auto result = dlg->exec();
+                    if(result == QDialog::Accepted)
+                        appToBeLaunched = dlg->getSelectedApplication();
+                    else
+                        exit(0);
+                } else if(appCandidates.length() > 1) {
+                    ApplicationSelectionDialog *dlg = new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, &appCandidates, false, nullptr);
+                    auto result = dlg->exec();
+                    if(result == QDialog::Accepted)
+                        appToBeLaunched = dlg->getSelectedApplication();
+                    else
+                        exit(0);
                 } else {
                     appToBeLaunched = appCandidates[0];
                 }

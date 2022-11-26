@@ -13,7 +13,7 @@ class ApplicationSelectionDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit ApplicationSelectionDialog(QString *fileOrProtocol, QString *mimeType, QStringList *appCandidates, QString &selectedApplication, QWidget *parent = nullptr);
+    explicit ApplicationSelectionDialog(QString *fileOrProtocol, QString *mimeType, QStringList *appCandidates, bool showAlsoLegacyCandidates = false, QWidget *parent = nullptr);
     ~ApplicationSelectionDialog();
     QString getSelectedApplication();
 private:
