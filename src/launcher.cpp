@@ -299,6 +299,9 @@ int Launcher::launch(QStringList args)
     // for the application to be launched, so as to not break opening documents with applications;
     // we can only hope that such applications are smart enough to open the supplied document
     // using an already-running process instance. This is clumsy; how to do it better?
+    // We could check whethe the same application we are about to launch has windows
+    // open with the name/path of the file about to be opened in _NET_WM_NAME (e.g., FeatherPad)
+    // but that does not work reliably for all applictions, e.g.,"launch.html - Falkon"
     // TODO: Remove Menu special case here as soon as we can bring up its Search box with D-Bus
     if(args.length() < 1 && env.contains("LAUNCHED_BUNDLE") && (firstArg != "Menu")) {
         qDebug() << "# Checking for existing windows";
