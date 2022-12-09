@@ -1,7 +1,6 @@
 #include "applicationselectiondialog.h"
 #include "launcher.h"
 
-
 Launcher::Launcher()
     : db (new DbManager())
 {
@@ -76,7 +75,23 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString){
         QString cleartextString = QString("This application requires the Python module %1 to run.\n\nPlease install it and try again.").arg(missingPyModule);
         qmesg.warning( nullptr, title, cleartextString );
     } else {
-        qmesg.warning( nullptr, title, errorString );
+        // Show the first 10 lines of the error message, then ..., then the last 10 lines
+        QStringList lines = errorString.split("\n");
+        QString cleartextString = "";
+        for (int i = 0; i < 10; i++) {
+            if (i < lines.length()) {
+                cleartextString.append(lines[i] + "\n");
+            }
+        }
+        if (lines.length() > 20) {
+            cleartextString.append("...\n");
+        }
+        for (int i = lines.length() - 10; i < lines.length(); i++) {
+            if (i < lines.length()) {
+                cleartextString.append(lines[i] + "\n");
+            }
+        }
+        qmesg.warning( nullptr, title, cleartextString );
     }
 }
 
@@ -485,6 +500,21 @@ int Launcher::open(QStringList args)
         mimeType = QMimeDatabase().mimeTypeForFile(firstArg).name();
         qDebug() << "File to be opened has MIME type:" << mimeType;
 
+        // Handle legacy XDG style "file:///..." URIs
+        // by converting them to sane "/...". Example: Falkon downloads being double-clicked
+        if(firstArg.startsWith("file://")) {
+            firstArg = QUrl::fromEncoded(firstArg.toUtf8()).toLocalFile();
+        }
+
+        // Handle legacy XDG style "computer:///LIVE.mount" mount points
+        // by converting them to sane "/media/LIVE". For legacy compatibility reasons only
+        if((firstArg.startsWith("computer://")) && (firstArg.endsWith(".mount"))) {
+            appToBeLaunched = "Filer";
+            firstArg.replace("computer://", "").replace(".mount", "");
+            firstArg = "/media" + firstArg;
+        }
+
+        // Do this AFTER the special cases like "file://" and "computer://" have already been handled
         if(firstArg.contains(":/")){
             QUrl url = QUrl(firstArg);
             qDebug() << "Protocol" << url.scheme();
@@ -500,20 +530,6 @@ int Launcher::open(QStringList args)
         // so treat them as empty text files; TODO: Better ideas, anyone?
         if(mimeType == "application/x-zerosize" || mimeType == "inode/x-empty") {
             mimeType = "text/plain";
-        }
-
-        // Handle legacy XDG style "file:///..." URIs
-        // by converting them to sane "/...". Example: Falkon downloads being double-clicked
-        if(firstArg.startsWith("file://")) {
-            firstArg = QUrl::fromEncoded(firstArg.toUtf8()).toString().replace("file://", "");
-        }
-
-        // Handle legacy XDG style "computer:///LIVE.mount" mount points
-        // by converting them to sane "/media/LIVE". TODO: Get rid of them in Filer
-        if((firstArg.startsWith("computer://")) && (firstArg.endsWith(".mount"))) {
-            appToBeLaunched = "Filer";
-            firstArg.replace("computer://", "").replace(".mount", "");
-            firstArg = "/media" + firstArg;
         }
 
         // Do not attempt to open file types which are known to have no useful applications;
