@@ -3,7 +3,7 @@ freebsd_instance:
 
 env:
   CIRRUS_CLONE_DEPTH: 1
-  GITHUB_TOKEN: ENCRYPTED[!0f42e3f70fd51cdeddfe7e98160982fc9efe7e8a26869b725fcd5de05d067a7100b994cf52f0f1b470a983148e0b8ec2!]
+  GITHUB_TOKEN: ENCRYPTED[5658d2d703118b074accb59d28381d46e41ab09651434f8b85c64951b69d49c966a83f3206123070f56ab78f6fc84aef]
   
 task:
   # This name gets reported as a build status in GitHub
