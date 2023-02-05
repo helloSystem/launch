@@ -77,18 +77,31 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString){
     } else {
         // Show the first 10 lines of the error message, then ..., then the last 10 lines
         QStringList lines = errorString.split("\n");
+
+        // Remove all lines from QStringList lines that contain "from LD_PRELOAD cannot be preloaded"
+        // This is a known issue with the Linux compatibility layer, and we don't want to show it to the user
+        for (QStringList::iterator it = lines.begin(); it != lines.end();) {
+            if ((*it).contains("from LD_PRELOAD cannot be preloaded")) {
+                it = lines.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        qDebug() << "Alive?" << lines.length();
         QString cleartextString = "";
         for (int i = 0; i < 10; i++) {
             if (i < lines.length()) {
                 cleartextString.append(lines[i] + "\n");
             }
         }
-        if (lines.length() > 20) {
+        if (lines.length() > 10) {
             cleartextString.append("...\n");
-        }
-        for (int i = lines.length() - 10; i < lines.length(); i++) {
-            if (i < lines.length()) {
-                cleartextString.append(lines[i] + "\n");
+
+            for (int i = lines.length() - 10; i < lines.length(); i++) {
+                if (i < lines.length()) {
+                    cleartextString.append(lines[i] + "\n");
+                }
             }
         }
         qmesg.warning( nullptr, title, cleartextString );
