@@ -79,9 +79,9 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString){
         QStringList lines = errorString.split("\n");
 
         // Remove all lines from QStringList lines that contain "from LD_PRELOAD cannot be preloaded"
-        // This is a known issue with the Linux compatibility layer, and we don't want to show it to the user
+        // or "no version information available as these most likely are not relevant to the user
         for (QStringList::iterator it = lines.begin(); it != lines.end();) {
-            if ((*it).contains("from LD_PRELOAD cannot be preloaded")) {
+            if ((*it).contains("from LD_PRELOAD cannot be preloaded") || (*it).contains("no version information available (required by")) {
                 it = lines.erase(it);
             } else {
                 ++it;
