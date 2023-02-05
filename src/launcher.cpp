@@ -57,6 +57,10 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString){
         QString cleartextString = "The Linux compatibility layer reports an older kernel version than what is required to run this application.\n\n" \
                                   "Please run\nsudo sysctl compat.linux.osrelease=5.0.0\nand try again.";
         qmesg.warning( nullptr, title, cleartextString );
+    } else if(errorString.contains("setuid_sandbox_host.cc")) {
+        QString cleartextString = "Cannot run Chromium-based applications with a sandbox.\n" \
+                                  "Please try running it with the --no-sandbox argument.";
+        qmesg.warning(nullptr, title, cleartextString);
     } else if (rx.indexIn(errorString) == 0) {
         QString outdatedLib = rx.cap(1);
         QString versionNeeded = rx.cap(2);
