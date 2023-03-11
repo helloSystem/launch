@@ -1,14 +1,18 @@
 #include "applicationselectiondialog.h"
 #include "ui_applicationselectiondialog.h"
 
-ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, QString *mimeType, QStringList *appCandidates, bool showAlsoLegacyCandidates, QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::ApplicationSelectionDialog)
+ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, QString *mimeType,
+                                                       QStringList *appCandidates,
+                                                       bool showAlsoLegacyCandidates,
+                                                       QWidget *parent)
+    : QDialog(parent), ui(new Ui::ApplicationSelectionDialog)
 {
     QString selectedApplication;
 
     ui->setupUi(this);
-    ui->label->setText(QString("Please choose an application to open \n'%1'\nof type '%2':" ).arg(*fileOrProtocol).arg(*mimeType));
+    ui->label->setText(QString("Please choose an application to open \n'%1'\nof type '%2':")
+                               .arg(*fileOrProtocol)
+                               .arg(*mimeType));
 
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -20,39 +24,37 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
 
     QStringList preferedAppCandidates = {};
     for (const QString appCandidate : *appCandidates) {
-        if(!appCandidate.endsWith(".desktop")) {
+        if (!appCandidate.endsWith(".desktop")) {
             preferedAppCandidates.append(appCandidate);
         }
     }
 
-    if(!showAlsoLegacyCandidates && preferedAppCandidates.length() > 0) {
+    if (!showAlsoLegacyCandidates && preferedAppCandidates.length() > 0) {
         // We have options that are not .desktop files; so just show those
-        for (auto r=0; r < preferedAppCandidates.length(); r++) {
+        for (auto r = 0; r < preferedAppCandidates.length(); r++) {
             QListWidgetItem *item = new QListWidgetItem(preferedAppCandidates.at(r));
             ui->listWidget->addItem(item);
-            if(r==0)
+            if (r == 0)
                 item->setSelected(true);
         }
     } else {
         // We need to show .desktop files because we have no other options available
         // or because showAlsoLegacyCandidates was requested
-        for (auto r=0; r < appCandidates->length(); r++) {
+        for (auto r = 0; r < appCandidates->length(); r++) {
             QListWidgetItem *item = new QListWidgetItem(appCandidates->at(r));
             ui->listWidget->addItem(item);
-            if(r==0)
+            if (r == 0)
                 item->setSelected(true);
         }
     }
-
-
 }
 
 ApplicationSelectionDialog::~ApplicationSelectionDialog()
 {
     delete ui;
-
 }
 
-QString ApplicationSelectionDialog::getSelectedApplication() {
-   return ui->listWidget->selectedItems().first()->text();
+QString ApplicationSelectionDialog::getSelectedApplication()
+{
+    return ui->listWidget->selectedItems().first()->text();
 }

@@ -3,7 +3,6 @@
 
 #include <QSqlDatabase>
 
-
 class DbManager
 {
 public:
@@ -13,15 +12,15 @@ public:
     bool isOpen() const;
     QStringList allApplications() const;
     bool removeAllApplications();
-    bool applicationExists(const QString& name) const;
+    bool applicationExists(const QString &name) const;
     QString getCanOpenFromFile(QString canonicalPath);
     bool filesystemSupportsExtattr;
 
 private:
     QSqlDatabase m_db;
     bool _createTable();
-    bool _addApplication(const QString& name);
-    bool _removeApplication(const QString& name);
+    bool _addApplication(const QString &name);
+    bool _removeApplication(const QString &name);
 
     unsigned int _numberOfApplications() const;
     static const QString _databasePath;

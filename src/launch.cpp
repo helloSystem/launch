@@ -18,10 +18,13 @@
  * 4. As a fallback, via Baloo? (not implemented yet)
  *
  * launch.db is populated
- * 1. By this tool (currently each time it is invoked; could be optimized to: only if application is not found)
- * 2. By the file manager when one looks at applications (can be implemented natively or using bundle-thumbnailer)
+ * 1. By this tool (currently each time it is invoked; could be optimized to: only if application is
+not found)
+ * 2. By the file manager when one looks at applications (can be implemented natively or using
+bundle-thumbnailer)
  *
- * If an application bundle is being launched that has existing windows and no arguments are passed in,
+ * If an application bundle is being launched that has existing windows and no arguments are passed
+in,
  * the existing windows are brought to the front instead of starting a new process.
  *
  * The environment variable LAUNCHED_EXECUTABLE is populated, and for bundles, the LAUNCHED_BUNDLE
@@ -50,7 +53,6 @@ will also list all paths that are attempted.
 
 */
 
-
 int main(int argc, char *argv[])
 {
 
@@ -71,22 +73,21 @@ int main(int argc, char *argv[])
 
     launcher->discoverApplications();
 
-    if(QFileInfo(argv[0]).fileName() == "launch") {
-        if(args.isEmpty()){
-            qCritical() << "USAGE:" << argv[0] << "<application to be launched> [<arguments>]" ;
+    if (QFileInfo(argv[0]).fileName() == "launch") {
+        if (args.isEmpty()) {
+            qCritical() << "USAGE:" << argv[0] << "<application to be launched> [<arguments>]";
             exit(1);
         }
         return launcher->launch(args);
     }
 
-    if(QFileInfo(argv[0]).fileName().endsWith("open")) {
-        if(args.isEmpty()){
-            qCritical() << "USAGE:" << argv[0] << "<document to be opened>" ;
+    if (QFileInfo(argv[0]).fileName().endsWith("open")) {
+        if (args.isEmpty()) {
+            qCritical() << "USAGE:" << argv[0] << "<document to be opened>";
             exit(1);
         }
         return launcher->open(args);
     }
 
     return 1;
-
 }

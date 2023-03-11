@@ -5,7 +5,6 @@
 
 #include "dbmanager.h"
 
-
 class AppDiscovery
 {
 public:

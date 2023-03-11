@@ -37,7 +37,7 @@ class QDetachableProcess : public QProcess
 
 {
 public:
-    QDetachableProcess(QObject *parent = 0) : QProcess(parent){}
+    QDetachableProcess(QObject *parent = 0) : QProcess(parent) { }
     void detach()
     {
         this->waitForStarted();
@@ -55,6 +55,7 @@ public:
     void discoverApplications();
     int launch(QStringList args);
     int open(const QStringList args);
+
 private:
     DbManager *db;
     void handleError(QDetachableProcess *p, QString errorString);
