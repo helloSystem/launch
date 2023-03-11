@@ -611,7 +611,7 @@ int Launcher::open(QStringList args)
         }
 
         // Check whether there is a symlink in ~/.local/share/launch/MIME/<...>/Default
-        // pointing to an application that exists on disk; use that if so
+        // pointing to an application that exists on disk; if yes, then use that
         if (!showChooserRequested) {
             QString mimePath = QString("%1/%2")
                                        .arg(db->localShareLaunchMimePath)
@@ -624,6 +624,32 @@ int Launcher::open(QStringList args)
                 } else {
                     // The symlink is broken
                     removalCandidates.append(defaultApp);
+                }
+            }
+            // If there is no Default symlink, check how many symlinks there are in
+            // the directory and if there is only one, use that
+            else {
+                QDirIterator it(mimePath, QDir::Files | QDir::NoDotAndDotDot);
+                int count = 0;
+                while (it.hasNext()) {
+                    it.next();
+                    count++;
+                    if (count > 1)
+                        break;
+                }
+                if (count == 1) {
+                    // Check whether the only file in the directory is a symlink and whether it
+                    // points to an application that exists on disk
+                    QString onlyFile = it.filePath();
+                    if (QFileInfo(onlyFile).isSymLink()) {
+                        QString onlyApp = QFileInfo(onlyFile).symLinkTarget();
+                        if (QFileInfo::exists(onlyApp)) {
+                            appToBeLaunched = onlyApp;
+                        } else {
+                            // The symlink is broken
+                            removalCandidates.append(onlyApp);
+                        }
+                    }
                 }
             }
         }
