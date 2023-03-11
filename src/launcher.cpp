@@ -543,11 +543,10 @@ int Launcher::open(QStringList args)
     // opened with
     bool ok = false;
     QString openWith = Fm::getAttributeValueQString(firstArg, "open-with", ok);
-    if (ok) {
+    if (ok && !showChooserRequested) {
         // NOTE: For security reasons, the application must be known to the system
         // so that totally random commands won't get executed.
-        // Currently open-with needs to contain an absolute path
-        // contained in launch.db. This could
+        // This could
         // possibly be made more sophisticated by allowing the open-with
         // value to any kind of string that 'launch' knows to open;
         // to be decided. Behavior might change in the future.
@@ -611,6 +610,24 @@ int Launcher::open(QStringList args)
             }
         }
 
+        // Check whether there is a symlink in ~/.local/share/launch/MIME/<...>/Default
+        // pointing to an application that exists on disk; use that if so
+        if (!showChooserRequested) {
+            QString mimePath = QString("%1/%2")
+                                       .arg(db->localShareLaunchMimePath)
+                                       .arg(mimeType.replace("/", "_"));
+            QString defaultPath = QString("%1/Default").arg(mimePath);
+            if (QFileInfo::exists(defaultPath)) {
+                QString defaultApp = QFileInfo(defaultPath).symLinkTarget();
+                if (QFileInfo::exists(defaultApp)) {
+                    appToBeLaunched = defaultApp;
+                } else {
+                    // The symlink is broken
+                    removalCandidates.append(defaultApp);
+                }
+            }
+        }
+
         if (appToBeLaunched.isNull()) {
             QStringList appCandidates;
             QStringList fallbackAppCandidates; // Those where only the first part of
@@ -656,41 +673,32 @@ int Launcher::open(QStringList args)
                 appCandidates = fallbackAppCandidates;
             }
 
-            QString fileOrProtocol = QFileInfo(firstArg).fileName();
+            QString fileOrProtocol = QFileInfo(firstArg).canonicalFilePath();
             if (firstArg.contains(":/")) {
                 QUrl url = QUrl(firstArg);
                 fileOrProtocol = url.scheme() + "://";
             }
 
-            if (appCandidates.length() < 1) {
-                QMessageBox::warning(
-                        nullptr, " ",
-                        QString("Found no application that can open\n'%1'\nof type '%2'.")
-                                .arg(fileOrProtocol)
-                                .arg(mimeType)); // TODO: Show "Open With" dialog?
-                return 1;
+            if (showChooserRequested || appCandidates.length() < 1) {
+                ApplicationSelectionDialog *dlg =
+                        new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, true, nullptr);
+                auto result = dlg->exec();
+                if (result == QDialog::Accepted)
+                    appToBeLaunched = dlg->getSelectedApplication();
+                else
+                    exit(0);
+            } else if (appCandidates.length() > 1) {
+                ApplicationSelectionDialog *dlg =
+                        new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, false, nullptr);
+                auto result = dlg->exec();
+                if (result == QDialog::Accepted)
+                    appToBeLaunched = dlg->getSelectedApplication();
+                else
+                    exit(0);
             } else {
-                if (showChooserRequested) {
-                    ApplicationSelectionDialog *dlg = new ApplicationSelectionDialog(
-                            &fileOrProtocol, &mimeType, &appCandidates, true, nullptr);
-                    auto result = dlg->exec();
-                    if (result == QDialog::Accepted)
-                        appToBeLaunched = dlg->getSelectedApplication();
-                    else
-                        exit(0);
-                } else if (appCandidates.length() > 1) {
-                    ApplicationSelectionDialog *dlg = new ApplicationSelectionDialog(
-                            &fileOrProtocol, &mimeType, &appCandidates, false, nullptr);
-                    auto result = dlg->exec();
-                    if (result == QDialog::Accepted)
-                        appToBeLaunched = dlg->getSelectedApplication();
-                    else
-                        exit(0);
-                } else {
-                    appToBeLaunched = appCandidates[0];
-                }
-                qDebug() << "appToBeLaunched" << appToBeLaunched;
+                appToBeLaunched = appCandidates[0];
             }
+            qDebug() << "appToBeLaunched" << appToBeLaunched;
         }
     }
     // Garbage collect launch.db: Remove applications that are no longer on the

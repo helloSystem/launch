@@ -22,9 +22,9 @@
     </widget>
    </item>
    <item row="2" column="0">
-    <widget class="QCheckBox" name="checkBox">
+    <widget class="QCheckBox" name="checkBoxAlwaysOpenThis">
      <property name="enabled">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <property name="text">
       <string>Always open this document with this application</string>
@@ -52,9 +52,9 @@
     </widget>
    </item>
    <item row="3" column="0">
-    <widget class="QCheckBox" name="checkBox_2">
+    <widget class="QCheckBox" name="checkBoxAlwaysOpenAll">
      <property name="enabled">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <property name="text">
       <string>Open all documents of this type with this application</string>

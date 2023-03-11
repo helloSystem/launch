@@ -14,13 +14,15 @@ class ApplicationSelectionDialog : public QDialog
 
 public:
     explicit ApplicationSelectionDialog(QString *fileOrProtocol, QString *mimeType,
-                                        QStringList *appCandidates,
                                         bool showAlsoLegacyCandidates = false,
                                         QWidget *parent = nullptr);
     ~ApplicationSelectionDialog();
     QString getSelectedApplication();
 
 private:
+    QString *fileOrProtocol;
+    QString *mimeType;
+    bool showAlsoLegacyCandidates;
     Ui::ApplicationSelectionDialog *ui;
 };
 
