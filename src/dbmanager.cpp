@@ -108,6 +108,7 @@ QString DbManager::getCanOpenFromFile(QString canonicalPath)
                 QString getLine = in.readLine().trimmed();
                 if (getLine.startsWith("MimeType=")) {
                     mime = getLine.remove(0, 9);
+                    mime = mime.trimmed();
                     break;
                 }
             }
@@ -141,8 +142,16 @@ void DbManager::handleApplication(QString path)
             return;
         }
 
-        // Split mime types into a QStringList and create symlinks for each
+        // Split mime types into a QStringList
         QStringList mimeList = mime.split(";");
+        // Remove entries that consist of only whitespace
+        mimeList.removeAll("");
+        // Trim whitespace from each entry; this is needed because
+        // otherwise we get, e.g., "text/plain\n" instead of "text/plain"
+        for (int i = 0; i < mimeList.size(); ++i) {
+            mimeList[i] = mimeList[i].trimmed();
+        }
+
         for (QString mime : mimeList) {
 
             if (mime.isEmpty()) {

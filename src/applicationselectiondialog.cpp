@@ -131,7 +131,7 @@ QString ApplicationSelectionDialog::getSelectedApplication()
                                    .arg(QString(*mimeType).replace("/", "_"));
         QString defaultPath = QString("%1/Default").arg(mimePath);
 
-        // Remove the symlink if it exists, with GUI error reporting
+        // Remove the symlink if it exists
         if (QFile::exists(defaultPath)) {
             bool ok = false;
             ok = QFile::remove(defaultPath);
@@ -143,13 +143,24 @@ QString ApplicationSelectionDialog::getSelectedApplication()
             }
         }
 
-        // Create the symlink, with GUI error reporting
+        // Create the symlink
         bool ok = false;
         ok = QFile::link(appPath, defaultPath);
         if (!ok) {
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Critical);
             msgBox.setText("Could not create the default symlink");
+            msgBox.exec();
+        }
+
+        // Clear the open-with extended attribute so that it doesn't override the MIME-wide default
+        // for this file
+        ok = false;
+        ok = Fm::setAttributeValueQString(*fileOrProtocol, "open-with", NULL);
+        if (!ok) {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Critical);
+            msgBox.setText("Could not clear the 'open-with' extended attribute");
             msgBox.exec();
         }
     }
