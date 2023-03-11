@@ -1,5 +1,5 @@
-#include "applicationselectiondialog.h"
 #include "launcher.h"
+#include "applicationselectiondialog.h"
 
 Launcher::Launcher() : db(new DbManager()) { }
 
@@ -33,16 +33,19 @@ QString Launcher::getPackageUpdateCommand(QString pathToInstalledFile)
     return "";
 }
 
-// Translate cryptic errors into clear text, and possibly even offer buttons to take action
+// Translate cryptic errors into clear text, and possibly even offer buttons to
+// take action
 void Launcher::handleError(QDetachableProcess *p, QString errorString)
 {
     QMessageBox qmesg;
 
-    // Make this error message not appear in the Dock // FIXME: Does not work, why?
+    // Make this error message not appear in the Dock // FIXME: Does not work,
+    // why?
     qmesg.setWindowFlag(Qt::SubWindow);
 
-    // If we can't make the icon go away in the Dock, at least make it a non-placeholder icon
-    // Not sure if the Dock is already reflecting the WindowIcon correctly
+    // If we can't make the icon go away in the Dock, at least make it a
+    // non-placeholder icon Not sure if the Dock is already reflecting the
+    // WindowIcon correctly
     // FIXME: Does not work, why?
     QIcon icon = QApplication::style()->standardIcon(QStyle::SP_MessageBoxWarning);
     qmesg.setWindowIcon(icon);
@@ -53,8 +56,8 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString)
     QString title = fi.completeBaseName(); // https://doc.qt.io/qt-5/qfileinfo.html#completeBaseName
     if (errorString.contains("FATAL: kernel too old")) {
         QString cleartextString =
-                "The Linux compatibility layer reports an older kernel version than what is "
-                "required to run this application.\n\n"
+                "The Linux compatibility layer reports an older kernel version than "
+                "what is required to run this application.\n\n"
                 "Please run\nsudo sysctl compat.linux.osrelease=5.0.0\nand try again.";
         qmesg.warning(nullptr, title, cleartextString);
     } else if (errorString.contains("setuid_sandbox_host.cc")) {
@@ -86,12 +89,13 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString)
                                           .arg(missingPyModule);
         qmesg.warning(nullptr, title, cleartextString);
     } else {
-        // Show the first 10 lines of the error message, then ..., then the last 10 lines
+        // Show the first 10 lines of the error message, then ..., then the last 10
+        // lines
         QStringList lines = errorString.split("\n");
 
-        // Remove all lines from QStringList lines that contain "from LD_PRELOAD cannot be
-        // preloaded" or "no version information available as these most likely are not relevant to
-        // the user
+        // Remove all lines from QStringList lines that contain "from LD_PRELOAD
+        // cannot be preloaded" or "no version information available as these most
+        // likely are not relevant to the user
         for (QStringList::iterator it = lines.begin(); it != lines.end();) {
             if ((*it).contains("from LD_PRELOAD cannot be preloaded")
                 || (*it).contains("no version information available (required by")) {
@@ -130,9 +134,10 @@ void Launcher::discoverApplications()
     AppDiscovery *ad = new AppDiscovery(db);
     QStringList wellKnownLocs = ad->wellKnownApplicationLocations();
     ad->findAppsInside(wellKnownLocs);
+    // Print to stdout how long it took to discover applications
     qDebug() << "Took" << timer.elapsed()
-             << "milliseconds to discover applications and add them to launch.db, part of which "
-                "was logging";
+             << "milliseconds to discover applications and add them to "
+                "launch.db, part of which was logging";
     // ad->~AppDiscovery(); // FIXME: Doing this here would lead to a crash; why?
 }
 
@@ -147,8 +152,8 @@ QStringList Launcher::executableForBundleOrExecutablePath(QString bundleOrExecut
             if (bundleOrExecutablePath.endsWith(".AppDir")) {
                 executable_candidate = bundleOrExecutablePath + "/AppRun";
             } else {
-                // The .app could be a symlink, so we need to determine the nameWithoutSuffix from
-                // its target
+                // The .app could be a symlink, so we need to determine the
+                // nameWithoutSuffix from its target
                 QString nameWithoutSuffix = QFileInfo(bundleOrExecutablePath).completeBaseName();
                 executable_candidate = bundleOrExecutablePath + "/" + nameWithoutSuffix;
             }
@@ -211,8 +216,8 @@ int Launcher::launch(QStringList args)
 
     args.pop_front();
 
-    // First, try to find something we can launch at the path that was supplied as an argument,
-    // Examples:
+    // First, try to find something we can launch at the path that was supplied as
+    // an argument, Examples:
     //    /Applications/LibreOffice.app
     //    /Applications/LibreOffice.AppDir
     //    /Applications/LibreOffice.AppImage
@@ -227,8 +232,8 @@ int Launcher::launch(QStringList args)
         QString candidate = QStandardPaths::findExecutable(firstArg);
         if (candidate != "") {
             qDebug() << "Found" << candidate << "on the $PATH";
-            executable = candidate; // Returns the absolute file path to the executable, or an empty
-                                    // string if not found
+            executable = candidate; // Returns the absolute file path to the
+                                    // executable, or an empty string if not found
         }
     }
 
@@ -241,16 +246,16 @@ int Launcher::launch(QStringList args)
         QElapsedTimer timer;
         timer.start();
 
-        // Iterate recursively through locationsContainingApps searching for AppRun files in
-        // matchingly named AppDirs
+        // Iterate recursively through locationsContainingApps searching for AppRun
+        // files in matchingly named AppDirs
 
         QFileInfoList candidates;
 
         QStringList allAppsFromDb = db->allApplications();
 
         for (QString appBundleCandidate : allAppsFromDb) {
-            // Now that we may have collected different candidates, decide on which one to use
-            // e.g., the one with the highest self-declared version number.
+            // Now that we may have collected different candidates, decide on which
+            // one to use e.g., the one with the highest self-declared version number.
             // Also we need to check whether the appBundleCandidate exist
             // For now, just use the first one
             if (pathWithoutBundleSuffix(appBundleCandidate).endsWith(firstArg)) {
@@ -259,18 +264,18 @@ int Launcher::launch(QStringList args)
                     selectedBundle = appBundleCandidate;
                     break;
                 } else {
-                    db->handleApplication(
-                            appBundleCandidate); // Remove from launch.db it if it does not exist
+                    db->handleApplication(appBundleCandidate); // Remove from launch.db it
+                                                               // if it does not exist
                 }
             }
         }
 
         // For the selectedBundle, get the launchable executable
         if (selectedBundle == "") {
-            QMessageBox::warning(
-                    nullptr, " ",
-                    QString("The application '%1'\ncan't be launched because it can't be found.")
-                            .arg(firstArg));
+            QMessageBox::warning(nullptr, " ",
+                                 QString("The application '%1'\ncan't be launched "
+                                         "because it can't be found.")
+                                         .arg(firstArg));
             exit(1);
         } else {
             QStringList e = executableForBundleOrExecutablePath(selectedBundle);
@@ -279,10 +284,10 @@ int Launcher::launch(QStringList args)
         }
     }
 
-    // .desktop files can have arguments in them, and we need to insert the arguments given
-    // to launch on the command line into the arguments coming from the desktop file.
-    // So we have to construct arguments from the desktop file and from the command line
-    // Things like this make XDG overly complex!
+    // .desktop files can have arguments in them, and we need to insert the
+    // arguments given to launch on the command line into the arguments coming
+    // from the desktop file. So we have to construct arguments from the desktop
+    // file and from the command line Things like this make XDG overly complex!
     QStringList constructedArgs = {};
 
     QStringList execLinePartsFromDesktopFile = executableForBundleOrExecutablePath(firstArg);
@@ -322,26 +327,27 @@ int Launcher::launch(QStringList args)
     // procstat -e $(xprop | grep PID | cut -d " " -f 3)
     qDebug() << "info.canonicalFilePath():" << info.canonicalFilePath();
     qDebug() << "executable:" << executable;
-    env.remove("LAUNCHED_BUNDLE"); // So that nested launches won't leak LAUNCHED_BUNDLE from parent
-                                   // to child application; works
+    env.remove("LAUNCHED_BUNDLE"); // So that nested launches won't leak LAUNCHED_BUNDLE
+                                   // from parent to child application; works
     if (info.dir().absolutePath().toLower().endsWith(".appdir")
         || info.dir().absolutePath().toLower().endsWith(".app")) {
         qDebug() << "# Bundle directory (.app, .AppDir)" << info.dir().canonicalPath();
         qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
         env.insert("LAUNCHED_BUNDLE",
-                   info.dir().canonicalPath()); // Resolve symlinks so as to show the real location
+                   info.dir().canonicalPath()); // Resolve symlinks so as to show
+                                                // the real location
     } else if (fileInfo.canonicalFilePath().toLower().endsWith(".appimage")) {
         qDebug() << "# Bundle file (.AppImage)" << fileInfo.canonicalFilePath();
         qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
-        env.insert(
-                "LAUNCHED_BUNDLE",
-                fileInfo.canonicalFilePath()); // Resolve symlinks so as to show the real location
+        env.insert("LAUNCHED_BUNDLE",
+                   fileInfo.canonicalFilePath()); // Resolve symlinks so as to show
+                                                  // the real location
     } else if (fileInfo.canonicalFilePath().endsWith(".desktop")) {
         qDebug() << "# Bundle file (.desktop)" << fileInfo.canonicalFilePath();
         qDebug() << "# Setting LAUNCHED_BUNDLE environment variable to it";
-        env.insert(
-                "LAUNCHED_BUNDLE",
-                fileInfo.canonicalFilePath()); // Resolve symlinks so as to show the real location
+        env.insert("LAUNCHED_BUNDLE",
+                   fileInfo.canonicalFilePath()); // Resolve symlinks so as to show
+                                                  // the real location
     }
     // qDebug() << "# env" << env.toStringList();
     p.setProcessEnvironment(env);
@@ -352,16 +358,18 @@ int Launcher::launch(QStringList args)
     qDebug() << "# program:" << p.program();
     qDebug() << "# args:" << args;
 
-    // If user launches an application bundle that has existing windows, bring those to the front
-    // instead of launching a second instance.
-    // FIXME: Currently we are doing this only if launch has been invoked without parameters
-    // for the application to be launched, so as to not break opening documents with applications;
-    // we can only hope that such applications are smart enough to open the supplied document
-    // using an already-running process instance. This is clumsy; how to do it better?
-    // We could check whethe the same application we are about to launch has windows
-    // open with the name/path of the file about to be opened in _NET_WM_NAME (e.g., FeatherPad)
-    // but that does not work reliably for all applictions, e.g.,"launch.html - Falkon"
-    // TODO: Remove Menu special case here as soon as we can bring up its Search box with D-Bus
+    // If user launches an application bundle that has existing windows, bring
+    // those to the front instead of launching a second instance.
+    // FIXME: Currently we are doing this only if launch has been invoked without
+    // parameters for the application to be launched, so as to not break opening
+    // documents with applications; we can only hope that such applications are
+    // smart enough to open the supplied document using an already-running process
+    // instance. This is clumsy; how to do it better? We could check whethe the
+    // same application we are about to launch has windows open with the name/path
+    // of the file about to be opened in _NET_WM_NAME (e.g., FeatherPad) but that
+    // does not work reliably for all applictions, e.g.,"launch.html - Falkon"
+    // TODO: Remove Menu special case here as soon as we can bring up its Search
+    // box with D-Bus
     if (args.length() < 1 && env.contains("LAUNCHED_BUNDLE") && (firstArg != "Menu")) {
         qDebug() << "# Checking for existing windows";
         const auto &windows = KWindowSystem::windows();
@@ -377,8 +385,8 @@ int Launcher::launch(QStringList args)
         if (foundExistingWindow) {
             qDebug() << "# Activated existing windows instead of launching a new instance";
 
-            // We can't exit immediately or else te windows won't become active; FIXME: Do this
-            // properly
+            // We can't exit immediately or else te windows won't become active;
+            // FIXME: Do this properly
             QTime dieTime = QTime::currentTime().addSecs(1);
             while (QTime::currentTime() < dieTime)
                 QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
@@ -390,8 +398,8 @@ int Launcher::launch(QStringList args)
         }
         ai->~ApplicationInfo();
     } else if (args.length() > 1) {
-        qDebug() << "# Not checking for existing windows because arguments were passed to the "
-                    "application";
+        qDebug() << "# Not checking for existing windows because arguments were "
+                    "passed to the application";
     } else {
         qDebug() << "# Not checking for existing windows";
     }
@@ -435,8 +443,9 @@ int Launcher::launch(QStringList args)
 
     p.waitForFinished(10
                       * 1000); // Blocks until process has finished or timeout occured (x seconds)
-    // Errors occuring thereafter will not be reported to the user in a message box anymore.
-    // This should cover most errors like missing libraries, missing interpreters, etc.
+    // Errors occuring thereafter will not be reported to the user in a message
+    // box anymore. This should cover most errors like missing libraries, missing
+    // interpreters, etc.
 
     if (p.state() == 0 and p.exitCode() != 0) {
         qDebug("Process is not running anymore and exit code was not 0");
@@ -468,9 +477,10 @@ int Launcher::launch(QStringList args)
         exit(p.exitCode());
     }
 
-    // When we have made it all the way to here, add our application to the launch.db
-    // TODO: Similarly, when we are trying to launch the bundle but it is not there anymore, then
-    // remove it from the launch.db
+    // When we have made it all the way to here, add our application to the
+    // launch.db
+    // TODO: Similarly, when we are trying to launch the bundle but it is not
+    // there anymore, then remove it from the launch.db
     if (env.contains("LAUNCHED_BUNDLE")) {
         db->handleApplication(env.value("LAUNCHED_BUNDLE"));
     }
@@ -483,8 +493,8 @@ int Launcher::launch(QStringList args)
     // without crashing the payload application
     // when it writes to stderr?
     // https://github.com/helloSystem/launch/issues/4
-    // TODO: Make these picked up by a crash reporter; maybe name them with the pid?
-    // p.setStandardErrorFile("/tmp/launch_error");
+    // TODO: Make these picked up by a crash reporter; maybe name them with the
+    // pid? p.setStandardErrorFile("/tmp/launch_error");
     // p.setStandardOutputFile("/tmp/launch_output");
     // p.setInputChannelMode(QProcess::ManagedInputChannel); // "Unforward"
 
@@ -507,11 +517,6 @@ int Launcher::open(QStringList args)
     QString firstArg = args.first();
     qDebug() << "open firstArg:" << firstArg;
 
-    if (!db->isOpen()) {
-        qCritical() << "Database is not open!";
-        return 1;
-    }
-
     QString appToBeLaunched = nullptr;
     QStringList
             removalCandidates = {}; // For applications that possibly don't exist on disk anymore
@@ -521,8 +526,8 @@ int Launcher::open(QStringList args)
             // Broken symlink
             // TODO: Offer to delete or fix broken symlinks
             QMessageBox::warning(nullptr, " ",
-                                 QString("The symlink '%1'\ncan't be opened because\nthe target "
-                                         "'%2'\ncan't be found.")
+                                 QString("The symlink '%1'\ncan't be opened "
+                                         "because\nthe target '%2'\ncan't be found.")
                                          .arg(firstArg)
                                          .arg(QFileInfo(firstArg).symLinkTarget()));
         } else {
@@ -534,7 +539,8 @@ int Launcher::open(QStringList args)
         exit(1);
     }
 
-    // Check whether the file to be opened specifies an application it wants to be opened with
+    // Check whether the file to be opened specifies an application it wants to be
+    // opened with
     bool ok = false;
     QString openWith = Fm::getAttributeValueQString(firstArg, "open-with", ok);
     if (ok) {
@@ -557,21 +563,23 @@ int Launcher::open(QStringList args)
         qDebug() << "File to be opened has MIME type:" << mimeType;
 
         // Handle legacy XDG style "file:///..." URIs
-        // by converting them to sane "/...". Example: Falkon downloads being double-clicked
+        // by converting them to sane "/...". Example: Falkon downloads being
+        // double-clicked
         if (firstArg.startsWith("file://")) {
             firstArg = QUrl::fromEncoded(firstArg.toUtf8()).toLocalFile();
         }
 
         // Handle legacy XDG style "computer:///LIVE.mount" mount points
-        // by converting them to sane "/media/LIVE". For legacy compatibility reasons only
+        // by converting them to sane "/media/LIVE". For legacy compatibility
+        // reasons only
         if ((firstArg.startsWith("computer://")) && (firstArg.endsWith(".mount"))) {
             appToBeLaunched = "Filer";
             firstArg.replace("computer://", "").replace(".mount", "");
             firstArg = "/media" + firstArg;
         }
 
-        // Do this AFTER the special cases like "file://" and "computer://" have already been
-        // handled
+        // Do this AFTER the special cases like "file://" and "computer://" have
+        // already been handled
         if (firstArg.contains(":/")) {
             QUrl url = QUrl(firstArg);
             qDebug() << "Protocol" << url.scheme();
@@ -583,14 +591,16 @@ int Launcher::open(QStringList args)
             appToBeLaunched = "Filer";
         }
 
-        // Empty files are reported as 'application/x-zerosize' here, but as "inode/x-empty" by
-        // 'file' so treat them as empty text files; TODO: Better ideas, anyone?
+        // Empty files are reported as 'application/x-zerosize' here, but as
+        // "inode/x-empty" by 'file' so treat them as empty text files; TODO: Better
+        // ideas, anyone?
         if (mimeType == "application/x-zerosize" || mimeType == "inode/x-empty") {
             mimeType = "text/plain";
         }
 
-        // Do not attempt to open file types which are known to have no useful applications;
-        // please let us know if you have better ideas for what to do with those
+        // Do not attempt to open file types which are known to have no useful
+        // applications; please let us know if you have better ideas for what to do
+        // with those
         QStringList blacklistedMimeTypes = { "application/octet-stream" };
         for (const QString blacklistedMimeType : blacklistedMimeTypes) {
             if ((mimeType == blacklistedMimeType) && (!firstArg.contains(":/"))) {
@@ -603,8 +613,8 @@ int Launcher::open(QStringList args)
 
         if (appToBeLaunched.isNull()) {
             QStringList appCandidates;
-            QStringList fallbackAppCandidates; // Those where only the first part of the MIME type
-                                               // before the "/" matches
+            QStringList fallbackAppCandidates; // Those where only the first part of
+                                               // the MIME type before the "/" matches
             const QStringList allApps = db->allApplications();
             for (const QString &app : allApps) {
 
@@ -637,8 +647,9 @@ int Launcher::open(QStringList args)
 
             qDebug() << "appCandidates:" << appCandidates;
 
-            // Falling back to applications where only the first part of the MIME type before the
-            // "/" matches; this does not make sense for x-scheme-handler though
+            // Falling back to applications where only the first part of the MIME type
+            // before the "/" matches; this does not make sense for x-scheme-handler
+            // though
             if ((appCandidates.length() < 1)
                 && (mimeType.split("/").first() != "x-scheme-handler")) {
                 qDebug() << "fallbackAppCandidates:" << fallbackAppCandidates;
@@ -682,7 +693,8 @@ int Launcher::open(QStringList args)
             }
         }
     }
-    // Garbage collect launch.db: Remove applications that are no longer on the filesystem
+    // Garbage collect launch.db: Remove applications that are no longer on the
+    // filesystem
     for (const QString removalCandidate : removalCandidates) {
         db->handleApplication(removalCandidate);
     }

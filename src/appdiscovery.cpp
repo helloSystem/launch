@@ -1,9 +1,9 @@
 #include "appdiscovery.h"
 
-#include <QDir>
-#include <QStringList>
 #include <QDebug>
+#include <QDir>
 #include <QStandardPaths>
+#include <QStringList>
 
 #include "dbmanager.h"
 
@@ -31,8 +31,8 @@ QStringList AppDiscovery::wellKnownApplicationLocations()
               "/usr/GNUstep/System/Applications" });
 
     // Add legacy locations for XDG compatibility
-    // On FreeBSD: "/home/user/.local/share/applications", "/usr/local/share/applications",
-    // "/usr/share/applications"
+    // On FreeBSD: "/home/user/.local/share/applications",
+    // "/usr/local/share/applications", "/usr/share/applications"
     wellKnownApplicationLocations.append(
             QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation));
 
@@ -42,15 +42,16 @@ QStringList AppDiscovery::wellKnownApplicationLocations()
 }
 
 void AppDiscovery::findAppsInside(QStringList locationsContainingApps)
-// probono: Check locationsContainingApps for applications and add them to the m_systemMenu.
+// probono: Check locationsContainingApps for applications and add them to the
+// m_systemMenu.
 // TODO: Nested submenus rather than flat ones with '→'
 // This code is similar to the code in the 'launch' command
 {
     QStringList nameFilter({ "*.app", "*.AppDir", "*.desktop", "*.AppImage", "*.appimage" });
     foreach (QString directory, locationsContainingApps) {
-        // Shall we process this directory? Only if it contains at least one application, to
-        // optimize for speed by not descending into directory trees that do not contain any
-        // applications at all. Can make a big difference.
+        // Shall we process this directory? Only if it contains at least one
+        // application, to optimize for speed by not descending into directory trees
+        // that do not contain any applications at all. Can make a big difference.
 
         QDir dir(directory);
         int numberOfAppsInDirectory = dir.entryList(nameFilter).length();
@@ -84,8 +85,8 @@ void AppDiscovery::findAppsInside(QStringList locationsContainingApps)
                        && QFileInfo(candidate).isDir() && candidate.endsWith("/..") == false
                        && candidate.endsWith("/.") == false && candidate.endsWith(".app") == false
                        && candidate.endsWith(".AppDir") == false) {
-                // qDebug() << "# Found" << file.fileName() << ", a directory that is not an .app
-                // bundle nor an .AppDir";
+                // qDebug() << "# Found" << file.fileName() << ", a directory that is
+                // not an .app bundle nor an .AppDir";
                 QStringList locationsToBeChecked({ candidate });
                 findAppsInside(locationsToBeChecked);
             }

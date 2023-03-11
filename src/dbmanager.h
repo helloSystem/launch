@@ -1,7 +1,7 @@
 #ifndef DBMANAGER_H
 #define DBMANAGER_H
 
-#include <QSqlDatabase>
+#include <QString>
 
 class DbManager
 {
@@ -12,18 +12,19 @@ public:
     bool isOpen() const;
     QStringList allApplications() const;
     bool removeAllApplications();
+    bool handleNonExistingApplicationSymlink(const QString &symlinkPath) const;
     bool applicationExists(const QString &name) const;
     QString getCanOpenFromFile(QString canonicalPath);
     bool filesystemSupportsExtattr;
+    static const QString localShareLaunchApplicationsPath;
+    static const QString localShareLaunchMimePath;
 
 private:
-    QSqlDatabase m_db;
     bool _createTable();
     bool _addApplication(const QString &name);
     bool _removeApplication(const QString &name);
 
     unsigned int _numberOfApplications() const;
-    static const QString _databasePath;
 };
 
 #endif // DBMANAGER_H

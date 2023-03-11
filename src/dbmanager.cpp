@@ -1,12 +1,19 @@
 #include "dbmanager.h"
-#include <QSqlQuery>
-#include <QSqlError>
-#include <QSqlRecord>
 #include <QDebug>
 #include <QDir>
+#include <QDirIterator>
 #include <QStandardPaths>
 
 #include "extattrs.h"
+
+// Make localShareLaunchApplicationsPath available to other classes
+const QString DbManager::localShareLaunchApplicationsPath =
+        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+        + "/launch/Applications/";
+
+// Make localShareLaunchMimePath available to other classes
+const QString DbManager::localShareLaunchMimePath =
+        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/launch/MIME/";
 
 DbManager::DbManager() : filesystemSupportsExtattr(false)
 {
@@ -14,8 +21,9 @@ DbManager::DbManager() : filesystemSupportsExtattr(false)
     qDebug() << "DbManager::DbManager()";
 
     // In order to find out whether it is worth doing costly operations regarding
-    // extattrs we check whether the filesystem supports them and only use them if it does.
-    // This should help speed up things on Live ISOs where extattrs don't seem to be supported.
+    // extattrs we check whether the filesystem supports them and only use them if
+    // it does. This should help speed up things on Live ISOs where extattrs don't
+    // seem to be supported.
     bool ok = false;
     ok = Fm::setAttributeValueInt("/usr", "filesystemSupportsExtattr", true);
     if (ok) {
@@ -26,53 +34,42 @@ DbManager::DbManager() : filesystemSupportsExtattr(false)
                     "or the command to set them needs 'chmod +s'; system will be slower";
     }
 
-    static const QString _databasePath =
-            QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
-            + QStringLiteral("/launch/launch.db");
+    // Create localShareLaunchMimePath and localShareLaunchApplicationsPath
+    QDir dir;
+    dir.mkpath(localShareLaunchMimePath);
+    dir.mkpath(localShareLaunchApplicationsPath);
 
-    QDir dir(QFileInfo(_databasePath).dir());
-    if (!dir.exists())
-        dir.mkpath(QFileInfo(_databasePath).dir().absolutePath());
+    // Check all symlinks in ~/.local/share/launch/ and remove any
+    // that point to non-existent files.
+    // TODO: Move to a location where it is
+    // only run periodically, e.g., when the application starts, or run delayed
+    // after an application is added
+    QDirIterator it(localShareLaunchApplicationsPath,
+                    QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        QString symlinkPath = it.next();
+        if (QFileInfo(symlinkPath).isSymLink()
+            && !QFileInfo(QFileInfo(symlinkPath).symLinkTarget()).exists()) {
+            handleNonExistingApplicationSymlink(symlinkPath);
+        }
+    }
 
-    m_db = QSqlDatabase::addDatabase("QSQLITE");
-
-    m_db.setDatabaseName(_databasePath);
-
-    if (!m_db.open()) {
-        qDebug() << QString("Error: connection with database %1 fail").arg(_databasePath);
-    } else {
-        // qDebug() << QString("Database %1: connection ok").arg(_databasePath);
-        _createTable(); // Creates a table if it doesn't exist. Otherwise, it will use existing
-                        // table.
+    // Check all symlinks in ~/.local/share/launch/MIME/ and remove any
+    // that point to non-existent files.
+    // after an application is added
+    QDirIterator it2(localShareLaunchMimePath, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it2.hasNext()) {
+        QString symlinkPath = it2.next();
+        if (QFileInfo(symlinkPath).isSymLink()
+            && !QFileInfo(QFileInfo(symlinkPath).symLinkTarget()).exists()) {
+            handleNonExistingApplicationSymlink(symlinkPath);
+        }
     }
 }
 
 DbManager::~DbManager()
 {
-    if (m_db.isOpen()) {
-        m_db.close();
-    }
     qDebug() << "DbManager::~DbManager()";
-}
-
-bool DbManager::isOpen() const
-{
-    return m_db.isOpen();
-}
-
-bool DbManager::_createTable()
-{
-    bool success = false;
-
-    QSqlQuery query;
-    query.prepare("CREATE TABLE applications(path TEXT PRIMARY KEY);");
-
-    if (!query.exec()) {
-        // qDebug() << "Couldn't create the table 'applications': one might already exist.";
-        success = false;
-    }
-
-    return success;
 }
 
 // Read "can-open" file and return its contents as a QString;
@@ -93,14 +90,15 @@ QString DbManager::getCanOpenFromFile(QString canonicalPath)
         return in.readAll();
     } else if (canonicalPath.endsWith(".desktop")) {
         bool ok = false;
-        Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
+        QString canOpenFromExtAttr = Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
         if (ok)
-            return QString(); // extattr is already set
+            return canOpenFromExtAttr; // extattr is already set
         // The following removes everything after a ';' which XDG loves to use
         // even though they are comments in .ini files...
         // QSettings desktopFile(canonicalPath, QSettings::IniFormat);
         // QString mime = desktopFile.value("Desktop Entry/MimeType").toString();
-        // Hence we have to do it the hard way. Yet another example of why XDG is too complex
+        // Hence we have to do it the hard way. Yet another example of why XDG is
+        // too complex
         QFile f(canonicalPath);
         QString mime = "";
         f.open(QIODevice::ReadOnly | QIODevice::Text);
@@ -110,7 +108,7 @@ QString DbManager::getCanOpenFromFile(QString canonicalPath)
                 QString getLine = in.readLine().trimmed();
                 if (getLine.startsWith("MimeType=")) {
                     mime = getLine.remove(0, 9);
-                    continue;
+                    break;
                 }
             }
         }
@@ -133,25 +131,59 @@ void DbManager::handleApplication(QString path)
     } else {
         // qDebug() << "Adding" << canonicalPath << "to launch.db";
         _addApplication(canonicalPath);
-        // If extended attributes are not supported, there is nothing else to be done here
+
+        QString mime = getCanOpenFromFile(canonicalPath);
+        if (mime.isEmpty()) {
+            qDebug() << "No MIME types found in" << canonicalPath;
+            return;
+        } else if (mime == "") {
+            qDebug() << "Empty MIME types found in" << canonicalPath;
+            return;
+        }
+
+        // Split mime types into a QStringList and create symlinks for each
+        QStringList mimeList = mime.split(";");
+        for (QString mime : mimeList) {
+
+            if (mime.isEmpty()) {
+                continue;
+            }
+
+            QString mimeDir = localShareLaunchMimePath + "/" + mime.replace("/", "_");
+            if (!QFileInfo(mimeDir).isDir()) {
+                QDir dir;
+                dir.mkpath(mimeDir);
+            }
+
+            QString link = mimeDir + "/" + QFileInfo(canonicalPath).fileName();
+
+            if (QFileInfo(link).isSymLink()) {
+                qDebug() << "Not creating symlink for" << mime << "because it already"
+                         << "exists";
+                continue;
+            }
+            bool ok = QFile::link(canonicalPath, link);
+            if (ok) {
+                qDebug() << "Created symlink for" << mime << "in" << localShareLaunchMimePath;
+            } else {
+                qDebug() << "Cannot create symlink for" << mime << "in" << localShareLaunchMimePath;
+            }
+        }
+
+        // If extended attributes are not supported, there is nothing else to be
+        // done here
         if (!filesystemSupportsExtattr) {
             return;
         }
 
-        // Set 'can-open' extattr if 'can-open' extattr doesn't already exist but 'can-open' file
-        // exists
+        // Set 'can-open' extattr if 'can-open' extattr doesn't already exist but
+        // 'can-open' file exists
         bool ok = false;
         Fm::getAttributeValueQString(canonicalPath, "can-open", ok);
         if (ok)
             return; // extattr is already set
-        QString mime = getCanOpenFromFile(canonicalPath);
-        if (mime.isEmpty()) {
-            qDebug() << "No 'can-open' file:" << canonicalPath;
-            return;
-        } else if (mime == "") {
-            qDebug() << "Empty 'can-open' file:" << canonicalPath;
-            return;
-        }
+
+        // Set 'can-open' extattr on the application
         ok = Fm::setAttributeValueQString(canonicalPath, "can-open", mime);
         if (ok) {
             qDebug() << "Set xattr 'can-open' on" << canonicalPath;
@@ -163,18 +195,62 @@ void DbManager::handleApplication(QString path)
 
 bool DbManager::_addApplication(const QString &path)
 {
+
     bool success = false;
 
-    if (!path.isEmpty()) {
-        QSqlQuery queryAdd;
-        queryAdd.prepare("INSERT INTO applications (path) VALUES (:path)");
-        queryAdd.bindValue(":path", path);
+    if (path.isEmpty())
+        return false;
 
-        if (queryAdd.exec()) {
-            success = true;
+    // Prevent recursion by checking if the path starts with the
+    // localShareLaunchPath
+    if (path.startsWith(localShareLaunchApplicationsPath)
+        || path.startsWith(localShareLaunchMimePath)) {
+        qDebug() << "Not creating symlink for" << path << "because it is in"
+                 << localShareLaunchApplicationsPath << "or" << localShareLaunchMimePath;
+        return success;
+    }
+
+    // Check if a symlink to the target already exists in the directory
+    // ~/.local/share/launch/Applications under any name that starts
+    // with the name of the target sans extension
+    // If it does, do nothing
+    // If it doesn't, create a symlink to the target in the directory
+
+    // Get name of target sans extension
+    QString targetName = QFileInfo(path).fileName();
+    targetName = targetName.left(targetName.lastIndexOf("."));
+    QString targetCompleteSuffix = QFileInfo(path).completeSuffix();
+
+    // Check for existing symlinks to the target
+
+    bool found = false;
+
+    // Check for symlinks that start with the name of the target sans extension
+    // to also catch -2, -3, etc.
+    QDirIterator it2(localShareLaunchApplicationsPath,
+                     QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it2.hasNext()) {
+        QString symlinkPath = it2.next();
+        if (QFileInfo(symlinkPath).symLinkTarget() == path) {
+            found = true;
+            break;
         }
-    } else {
-        qDebug() << "add application failed: path cannot be empty";
+    }
+
+    if (!found) {
+        QString linkPath = localShareLaunchApplicationsPath + QFileInfo(path).fileName();
+        int i = 2;
+        while (QFileInfo(linkPath).exists()) {
+            linkPath = localShareLaunchApplicationsPath + targetName + "-" + QString::number(i)
+                    + "." + targetCompleteSuffix;
+            i++;
+        }
+        if (QFile::link(path, linkPath)) {
+            qDebug() << "Created symlink:" << linkPath;
+            success = true;
+        } else {
+            qDebug() << "Failed to create symlink:" << linkPath;
+        }
     }
 
     return success;
@@ -184,69 +260,120 @@ bool DbManager::_removeApplication(const QString &path)
 {
     bool success = false;
 
-    if (applicationExists(path)) {
-        QSqlQuery queryDelete;
-        queryDelete.prepare("DELETE FROM applications WHERE path = (:path)");
-        queryDelete.bindValue(":path", path);
-        success = queryDelete.exec();
-
-        if (!success) {
-            qDebug() << "remove application failed: " << queryDelete.lastError();
+    // Remove all symlinks from ~/.local/share/launch/Applications that point to
+    // the target
+    QDirIterator it(localShareLaunchApplicationsPath,
+                    QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        QString symlinkPath = it.next();
+        if (QFileInfo(symlinkPath).isSymLink()
+            && QFileInfo(QFileInfo(symlinkPath).symLinkTarget()).canonicalFilePath()
+                    == QFileInfo(path).canonicalFilePath()) {
+            if (QFile::remove(symlinkPath)) {
+                qDebug() << "Removed symlink:" << symlinkPath;
+                success = true;
+            } else {
+                qDebug() << "Failed to remove symlink:" << symlinkPath;
+            }
         }
     }
 
     return success;
 }
 
-// NOTE: Currently we are doing 2 SQL queries to ensure that .desktop files
-// are only being used as a last resort. Once we are more smart about prioritizing
-// which application candidate to use, we may want to reduce this to having just
-// one query here again
 QStringList DbManager::allApplications() const
 {
+
     QStringList results;
-    QTextStream cout(stdout);
-    // Prefer everything but .desktop files
-    QSqlQuery query("SELECT * FROM applications WHERE path NOT LIKE '%.desktop'");
-    int idName = query.record().indexOf("path");
-    while (query.next()) {
-        results.append(query.value(idName).toString());
+
+    // Check all symlinks in ~/.local/share/launch/Applications and get their
+    // targets if they exist, delete them otherwise
+    QDirIterator it(localShareLaunchApplicationsPath,
+                    QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        QString symlinkPath = it.next();
+        if (QFileInfo(symlinkPath).isSymLink()) {
+            QString target = QFileInfo(symlinkPath).symLinkTarget();
+            if (QFileInfo(target).exists()) {
+                results.append(target);
+            } else {
+                handleNonExistingApplicationSymlink(symlinkPath);
+            }
+        }
     }
-    // Fall back to .desktop files
-    QSqlQuery query2("SELECT * FROM applications WHERE path LIKE '%.desktop'");
-    int idName2 = query2.record().indexOf("path");
-    while (query2.next()) {
-        results.append(query2.value(idName2).toString());
-    }
+
+    // Sort the results so that they are in alphabetical order and .desktop files
+    // are at the end
+    std::sort(results.begin(), results.end(), [](const QString &a, const QString &b) {
+        if (a.endsWith(".desktop") && !b.endsWith(".desktop")) {
+            return false;
+        } else if (!a.endsWith(".desktop") && b.endsWith(".desktop")) {
+            return true;
+        } else {
+            return a < b;
+        }
+    });
+
     return results;
 }
 
 unsigned int DbManager::_numberOfApplications() const
 {
-    QSqlQuery query("SELECT COUNT(*) as cnt FROM applications");
-    if (query.next()) {
-        return query.value(0).toInt();
-    } else {
-        return 0;
+    // Count the number of valid symlinks in
+    // ~/.local/share/launch/Applications
+    unsigned int count = 0;
+    QDirIterator it(localShareLaunchApplicationsPath,
+                    QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        QString symlinkPath = it.next();
+        if (QFileInfo(symlinkPath).isSymLink()) {
+            QString target = QFileInfo(symlinkPath).symLinkTarget();
+            if (QFileInfo(target).exists()) {
+                count++;
+            } else {
+                handleNonExistingApplicationSymlink(symlinkPath);
+            }
+        }
     }
+    return count;
+}
+
+bool DbManager::handleNonExistingApplicationSymlink(const QString &symlinkPath) const
+{
+    // Exit if symlinkPath is not a symlink
+    if (!QFileInfo(symlinkPath).isSymLink()) {
+        return false;
+    }
+    qDebug() << "Removing symlink to non-existent file:" << symlinkPath;
+    // TODO: We could get fancy here and check whether similar applications exist
+    // at the target path (e.g., newer versions) and if so, ask the user whether
+    // they want to create a new symlink to the new location
+    QFile::remove(symlinkPath);
+    return true;
 }
 
 bool DbManager::applicationExists(const QString &path) const
 {
     bool exists = false;
-
-    QSqlQuery checkQuery;
-    checkQuery.prepare("SELECT path FROM applications WHERE path = (:path)");
-    checkQuery.bindValue(":path", path);
-
-    if (checkQuery.exec()) {
-        if (checkQuery.next()) {
-            exists = true;
+    // Check all symlinks in ~/.local/share/launch/Applications and get their
+    // targets if they exist, delete them otherwise. If the target of a symlink
+    // matches the path, the application exists
+    QDirIterator it(localShareLaunchApplicationsPath,
+                    QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        QString symlinkPath = it.next();
+        if (QFileInfo(symlinkPath).isSymLink()) {
+            QString target = QFileInfo(symlinkPath).symLinkTarget();
+            if (QFileInfo(target).exists()) {
+                if (target == path) {
+                    exists = true;
+                    break;
+                }
+            } else {
+                handleNonExistingApplicationSymlink(symlinkPath);
+            }
         }
-    } else {
-        qDebug() << "application exists failed: " << checkQuery.lastError();
     }
-
     return exists;
 }
 
@@ -254,14 +381,15 @@ bool DbManager::removeAllApplications()
 {
     bool success = false;
 
-    QSqlQuery removeQuery;
-    removeQuery.prepare("DELETE FROM applications");
-
-    if (removeQuery.exec()) {
-        success = true;
-    } else {
-        qDebug() << "remove all applications failed: " << removeQuery.lastError();
+    // Delete all symlinks in ~/.local/share/launch/Applications
+    QDirIterator it(localShareLaunchApplicationsPath,
+                    QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        QString symlinkPath = it.next();
+        if (QFileInfo(symlinkPath).isSymLink()) {
+            qDebug() << "Removing symlink:" << symlinkPath;
+            QFile::remove(symlinkPath);
+        }
     }
-
     return success;
 }
