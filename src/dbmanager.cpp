@@ -167,8 +167,8 @@ void DbManager::handleApplication(QString path)
             QString link = mimeDir + "/" + QFileInfo(canonicalPath).fileName();
 
             if (QFileInfo(link).isSymLink()) {
-                qDebug() << "Not creating symlink for" << mime << "because it already"
-                         << "exists";
+                // qDebug() << "Not creating symlink for" << mime << "because it already"
+                //          << "exists";
                 continue;
             }
             bool ok = QFile::link(canonicalPath, link);

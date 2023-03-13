@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QListWidget>
+#include "dbmanager.h"
 
 namespace Ui {
 class ApplicationSelectionDialog;
@@ -24,6 +25,7 @@ private:
     QString *mimeType;
     bool showAlsoLegacyCandidates;
     Ui::ApplicationSelectionDialog *ui;
+    DbManager *db;
 };
 
 #endif // APPLICATIONSELECTIONDIALOG_H

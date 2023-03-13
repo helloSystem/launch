@@ -1,7 +1,7 @@
 #include "applicationselectiondialog.h"
 #include "ui_applicationselectiondialog.h"
 #include <QDebug>
-#include "dbmanager.h"
+
 #include "extattrs.h"
 #include <QDir>
 #include <QMessageBox>
@@ -30,19 +30,21 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
     ui->checkBoxAlwaysOpenThis->setEnabled(false);
     ui->checkBoxAlwaysOpenAll->setEnabled(false);
 
+    QStringList *appCandidates;
+    DbManager *db;
+
     // When selection changes and something is selected, enable the checkboxes
+    // For URL scheme handlers, setting the default application "for this file" is not possible
     connect(ui->listWidget, &QListWidget::itemSelectionChanged, [=]() {
         if (ui->listWidget->selectedItems().length() > 0) {
-            ui->checkBoxAlwaysOpenThis->setEnabled(true);
+            if (!mimeType->startsWith("x-scheme-handler"))
+                ui->checkBoxAlwaysOpenThis->setEnabled(true);
             ui->checkBoxAlwaysOpenAll->setEnabled(true);
         } else {
             ui->checkBoxAlwaysOpenThis->setEnabled(false);
             ui->checkBoxAlwaysOpenAll->setEnabled(false);
         }
     });
-
-    QStringList *appCandidates;
-    DbManager db;
 
     // Construct the path to the MIME type in question
     QString mimePath = QString("%1/%2")
@@ -107,7 +109,7 @@ ApplicationSelectionDialog::~ApplicationSelectionDialog()
 QString ApplicationSelectionDialog::getSelectedApplication()
 {
     QString appPath = ui->listWidget->selectedItems().first()->data(Qt::UserRole).toString();
-    if (ui->checkBoxAlwaysOpenThis->isChecked()) {
+    if (ui->checkBoxAlwaysOpenThis->isChecked() && db->filesystemSupportsExtattr) {
         qDebug() << "Writing open-with extended attribute";
         // Get the path from the selected item
 
@@ -125,7 +127,7 @@ QString ApplicationSelectionDialog::getSelectedApplication()
         qDebug() << "Creating default symlink for this MIME type";
         // Use dbmanager to create a symlink in ~/.local/share/launch/MIME/<...>/Default to the
         // selected application
-        DbManager db;
+
         QString mimePath = QString("%1/%2")
                                    .arg(DbManager::localShareLaunchMimePath)
                                    .arg(QString(*mimeType).replace("/", "_"));
@@ -153,15 +155,17 @@ QString ApplicationSelectionDialog::getSelectedApplication()
             msgBox.exec();
         }
 
-        // Clear the open-with extended attribute so that it doesn't override the MIME-wide default
-        // for this file
-        ok = false;
-        ok = Fm::setAttributeValueQString(*fileOrProtocol, "open-with", NULL);
-        if (!ok) {
-            QMessageBox msgBox;
-            msgBox.setIcon(QMessageBox::Critical);
-            msgBox.setText("Could not clear the 'open-with' extended attribute");
-            msgBox.exec();
+        if (db->filesystemSupportsExtattr && !fileOrProtocol->startsWith("x-scheme-handler")) {
+            // Clear the open-with extended attribute so that it doesn't override the MIME-wide
+            // default for this file
+            ok = false;
+            ok = Fm::setAttributeValueQString(*fileOrProtocol, "open-with", NULL);
+            if (!ok) {
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Critical);
+                msgBox.setText("Could not clear the 'open-with' extended attribute");
+                msgBox.exec();
+            }
         }
     }
 

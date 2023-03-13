@@ -9,7 +9,6 @@ public:
     DbManager();
     ~DbManager();
     void handleApplication(QString canonicalPath);
-    bool isOpen() const;
     QStringList allApplications() const;
     bool removeAllApplications();
     bool handleNonExistingApplicationSymlink(const QString &symlinkPath) const;

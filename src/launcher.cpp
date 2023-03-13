@@ -414,8 +414,14 @@ int Launcher::launch(QStringList args)
 
     // Blocks until process has started
     if (!p.waitForStarted()) {
-        QMessageBox::warning(nullptr, "", "Cannot launch\n" + firstArg);
-        exit(1);
+        // The reason we ended up here may well be that the file has executable permissions despite
+        // it not being an executable file, hence we can't launch it. So we try to open it with its
+        // default application
+        qDebug() << "# Failed to start process; trying to open it with its default application";
+        QStringList completeArgs = { firstArg };
+        completeArgs.append(args);
+        open(completeArgs);
+        exit(0);
     }
 
     if (env.value("LAUNCHED_BUNDLE") != "") {
@@ -521,7 +527,9 @@ int Launcher::open(QStringList args)
     QStringList
             removalCandidates = {}; // For applications that possibly don't exist on disk anymore
 
-    if ((!QFileInfo::exists(firstArg)) && (!firstArg.contains(":/"))) {
+    // NOTE: magnet:?xt=urn:btih:... URLs do not contain ":/"
+    if ((!QFileInfo::exists(firstArg)) && (!firstArg.contains(":/"))
+        && (!firstArg.contains(":?"))) {
         if (QFileInfo(firstArg).isSymLink()) {
             // Broken symlink
             // TODO: Offer to delete or fix broken symlinks
@@ -559,7 +567,6 @@ int Launcher::open(QStringList args)
     if (appToBeLaunched.isNull()) {
         // Get MIME type of file to be opened
         mimeType = QMimeDatabase().mimeTypeForFile(firstArg).name();
-        qDebug() << "File to be opened has MIME type:" << mimeType;
 
         // Handle legacy XDG style "file:///..." URIs
         // by converting them to sane "/...". Example: Falkon downloads being
@@ -579,7 +586,8 @@ int Launcher::open(QStringList args)
 
         // Do this AFTER the special cases like "file://" and "computer://" have
         // already been handled
-        if (firstArg.contains(":/")) {
+        // NOTE: magnet:?xt=urn:btih:... URLs do not contain ":/"
+        if (firstArg.contains(":/") || firstArg.contains(":?")) {
             QUrl url = QUrl(firstArg);
             qDebug() << "Protocol" << url.scheme();
             mimeType = "x-scheme-handler/" + url.scheme();
@@ -596,6 +604,8 @@ int Launcher::open(QStringList args)
         if (mimeType == "application/x-zerosize" || mimeType == "inode/x-empty") {
             mimeType = "text/plain";
         }
+
+        qDebug() << "File to be opened has MIME type:" << mimeType;
 
         // Do not attempt to open file types which are known to have no useful
         // applications; please let us know if you have better ideas for what to do
@@ -701,8 +711,7 @@ int Launcher::open(QStringList args)
 
             QString fileOrProtocol = QFileInfo(firstArg).canonicalFilePath();
             if (firstArg.contains(":/")) {
-                QUrl url = QUrl(firstArg);
-                fileOrProtocol = url.scheme() + "://";
+                fileOrProtocol = firstArg;
             }
 
             if (showChooserRequested || appCandidates.length() < 1) {
