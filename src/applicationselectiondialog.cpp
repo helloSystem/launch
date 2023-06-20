@@ -74,6 +74,81 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
         }
     }
 
+    // If there are no appCandidates, then search for applications that can open the MIME type
+    // up to the "_" part; e.g., if we have no candidates for "text_plain", then search for
+    // candidates for "text" instead
+    int appCandidatesCount = appCandidates->length();
+    if (appCandidatesCount == 0) {
+        qDebug() << "No candidates found for" << *mimeType;
+        qDebug() << "Hence looking for candidates for"
+                 << mimeType->replace("/", "_").split("_").first();
+        // Get the parent of mimePath
+        QString mimePathParent = QFileInfo(mimePath).path();
+        // Make a mimePathDirs list of all directories in localShareLaunchMimePath that start with
+        // e.g., "text_"
+        QStringList *mimePathDirs = new QStringList(
+                QDir(DbManager::localShareLaunchMimePath)
+                        .entryList(QDir::NoDotAndDotDot | QDir::AllDirs | QDir::NoSymLinks));
+        for (auto r = 0; r < mimePathDirs->length(); r++) {
+            if (!mimePathDirs->at(r).startsWith(
+                        QString(*mimeType).replace("/", "_").split("_").first() + "_")) {
+                mimePathDirs->removeAt(r);
+                r--;
+            }
+        }
+        // Prepend each entry in mimePathDirs with their path
+        for (auto r = 0; r < mimePathDirs->length(); r++) {
+            mimePathDirs->replace(r,
+                                  QString("%1/%2")
+                                          .arg(DbManager::localShareLaunchMimePath)
+                                          .arg(mimePathDirs->at(r)));
+        }
+
+        // In each of the mimePathDirs, look for candidates
+        for (auto r = 0; r < mimePathDirs->length(); r++) {
+            qDebug() << "Looking for candidates in" << mimePathDirs->at(r);
+            QDir dir(mimePathDirs->at(r));
+            dir.setFilter(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+            dir.setSorting(QDir::Name);
+            QStringList *dirEntries = new QStringList(dir.entryList());
+            for (auto s = 0; s < dirEntries->length(); s++) {
+                // Construct path from dirEntries->at(s) and mimePathDirs->at(r)
+                QString candPath = QString("%1/%2").arg(mimePathDirs->at(r)).arg(dirEntries->at(s));
+                appCandidates->append(candPath);
+            }
+        }
+    }
+
+    // Order apppCandidates by name and put ones ending in .desktop last
+    std::sort(appCandidates->begin(), appCandidates->end());
+    std::stable_sort(appCandidates->begin(), appCandidates->end(),
+                     [](const QString &a, const QString &b) {
+                         return a.endsWith(".desktop") < b.endsWith(".desktop");
+                     });
+
+    // Remove entries with the filename "Default" from appCandidates
+    for (auto r = 0; r < appCandidates->length(); r++) {
+        if (QFileInfo(appCandidates->at(r)).fileName() == "Default") {
+            appCandidates->removeAt(r);
+            r--;
+        }
+    }
+
+    // Print number of appCandidates
+    qDebug() << "Found" << appCandidates->length() << "candidates for" << *mimeType;
+
+    // Remove duplicates from appCandidates
+    appCandidates->removeDuplicates();
+
+    // Print number of appCandidates
+    qDebug() << "Found" << appCandidates->length() << "candidates for" << *mimeType;
+
+    // Print appCandidates, each on a new line
+    qDebug() << "appCandidates:";
+    for (auto r = 0; r < appCandidates->length(); r++) {
+        qDebug() << appCandidates->at(r);
+    }
+
     // Let's see if we have at least one application candidate that is not a desktop file;
     // only fall back to showing desktop files if we don't. Those are second-class citizens
     // only supported to a minimum extent for compatibility with legacy applications
@@ -85,6 +160,14 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
             preferredAppCandidates->append(appCandidates->at(r));
         }
     }
+
+    // Print how many desktop files we have
+    int desktopFilesCount = appCandidates->length() - preferredAppCandidates->length();
+    // Print how many non-desktop files we have
+    qDebug() << "Found" << preferredAppCandidates->length() << "non-desktop files";
+    qDebug() << "Found" << desktopFilesCount << "desktop files";
+    // Print whether showAlsoLegacyCandidates is true or false
+    qDebug() << "showAlsoLegacyCandidates:" << showAlsoLegacyCandidates;
 
     if (!showAlsoLegacyCandidates && preferredAppCandidates->length() > 0) {
         // Use preferredAppCandidates instead of appCandidates

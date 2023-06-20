@@ -716,14 +716,6 @@ int Launcher::open(QStringList args)
 
             if (showChooserRequested || appCandidates.length() < 1) {
                 ApplicationSelectionDialog *dlg =
-                        new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, true, nullptr);
-                auto result = dlg->exec();
-                if (result == QDialog::Accepted)
-                    appToBeLaunched = dlg->getSelectedApplication();
-                else
-                    exit(0);
-            } else if (appCandidates.length() > 1) {
-                ApplicationSelectionDialog *dlg =
                         new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, false, nullptr);
                 auto result = dlg->exec();
                 if (result == QDialog::Accepted)
