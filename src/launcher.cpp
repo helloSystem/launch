@@ -1,5 +1,12 @@
 #include "launcher.h"
 #include "applicationselectiondialog.h"
+#include <unistd.h>
+#include <QApplication>
+#include <KWindowSystem>
+#include <QX11Info>
+#include <NETWM>
+#include <X11/Xlib.h>
+#include <X11/Xatom.h>
 
 Launcher::Launcher() : db(new DbManager()) { }
 
@@ -376,8 +383,34 @@ int Launcher::launch(QStringList args)
         ApplicationInfo *ai = new ApplicationInfo();
         bool foundExistingWindow = false;
         for (WId wid : windows) {
+
             QString runningBundle = ai->bundlePathForWId(wid);
             if (runningBundle == env.value("LAUNCHED_BUNDLE")) {
+                // Check if the user ID which the application is running under is the same user ID as is the current user
+                // This is to avoid bringing to the front windows of other users (e.g., if we want to run as root)
+                // FIXME: Find a way that works on all platforms and takes ~3 lines of code instead of ~20
+                int pid = 0;
+                Display *display = XOpenDisplay(nullptr);
+                Atom type;
+                int format;
+                unsigned long nitems, bytes_after;
+                unsigned char *prop;
+                int status = XGetWindowProperty(display, wid, XInternAtom(display, "_NET_WM_PID", False), 0, 1, False, XA_CARDINAL, &type, &format, &nitems, &bytes_after, &prop);
+                if (status == Success && prop) {
+                    pid = *(unsigned long *)prop;
+                    XFree(prop);
+                }
+                XCloseDisplay(display);
+                qDebug() << "# _NET_WM_PID:" << pid;
+                QProcess process;
+                process.start("ps", QStringList() << "-p" << QString::number(pid) << "-o" << "user");
+                process.waitForFinished(-1);
+                QString processOutput = process.readAllStandardOutput();
+                if (processOutput.split("\n").at(1) != qgetenv("USER")) {
+                    qDebug() << "# Not activating window" << wid << "because it is running under a different user ID";
+                    continue;
+                }
+            
                 foundExistingWindow = true;
                 KWindowSystem::forceActiveWindow(wid);
             }
