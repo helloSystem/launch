@@ -2,8 +2,6 @@
 #include "applicationselectiondialog.h"
 #include <unistd.h>
 #include <QApplication>
-#include <KWindowSystem>
-#include <QX11Info>
 #include <NETWM>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
