@@ -192,7 +192,7 @@ ApplicationSelectionDialog::~ApplicationSelectionDialog()
 QString ApplicationSelectionDialog::getSelectedApplication()
 {
     QString appPath = ui->listWidget->selectedItems().first()->data(Qt::UserRole).toString();
-    if (ui->checkBoxAlwaysOpenThis->isChecked() && db->filesystemSupportsExtattr) {
+    if (ui->checkBoxAlwaysOpenThis->isChecked()) {
         qDebug() << "Writing open-with extended attribute";
         // Get the path from the selected item
 
@@ -207,6 +207,20 @@ QString ApplicationSelectionDialog::getSelectedApplication()
         }
 
     } else if (ui->checkBoxAlwaysOpenAll->isChecked()) {
+        
+        // Clear the open-with extended attribute if it exists
+        bool ok = false;
+        if (Fm::hasAttribute(*fileOrProtocol, "open-with")) {
+            qDebug() << "Clearing open-with extended attribute";
+            ok = Fm::removeAttribute(*fileOrProtocol, "open-with");
+            if (!ok) {
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Critical);
+                msgBox.setText("Could not clear the 'open-with' extended attribute");
+                msgBox.exec();
+            }
+        }
+        
         qDebug() << "Creating default symlink for this MIME type";
         // Use dbmanager to create a symlink in ~/.local/share/launch/MIME/<...>/Default to the
         // selected application
@@ -215,6 +229,22 @@ QString ApplicationSelectionDialog::getSelectedApplication()
                                    .arg(DbManager::localShareLaunchMimePath)
                                    .arg(QString(*mimeType).replace("/", "_"));
         QString defaultPath = QString("%1/Default").arg(mimePath);
+        qDebug() << "mimePath:" << mimePath;
+
+        // Check if the MIME path exists and is a directory; if not, create it
+        if (!QFile::exists(mimePath)) {
+            qDebug() << "Creating directory for this MIME type";
+            bool ok = false;
+            ok = QDir().mkpath(mimePath);
+            if (!ok) {
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Critical);
+                msgBox.setText("Could not create the directory for this MIME type");
+                msgBox.exec();
+            }
+        }
+
+        qDebug() << "Removing existing default symlink if it exists";
 
         // Remove the symlink if it exists
         if (QFile::exists(defaultPath)) {
@@ -228,8 +258,10 @@ QString ApplicationSelectionDialog::getSelectedApplication()
             }
         }
 
+        qDebug() << "Creating default symlink";
+
         // Create the symlink
-        bool ok = false;
+        ok = false;
         ok = QFile::link(appPath, defaultPath);
         if (!ok) {
             QMessageBox msgBox;
@@ -238,18 +270,6 @@ QString ApplicationSelectionDialog::getSelectedApplication()
             msgBox.exec();
         }
 
-        if (db->filesystemSupportsExtattr && !fileOrProtocol->startsWith("x-scheme-handler")) {
-            // Clear the open-with extended attribute so that it doesn't override the MIME-wide
-            // default for this file
-            ok = false;
-            ok = Fm::setAttributeValueQString(*fileOrProtocol, "open-with", NULL);
-            if (!ok) {
-                QMessageBox msgBox;
-                msgBox.setIcon(QMessageBox::Critical);
-                msgBox.setText("Could not clear the 'open-with' extended attribute");
-                msgBox.exec();
-            }
-        }
     }
 
     return ui->listWidget->selectedItems().first()->text();
