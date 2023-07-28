@@ -69,46 +69,6 @@ bool setAttributeValueInt(const QString &path, const QString &attribute, int val
 }
 
 /*
- * remove the extended attribute for the path
- */
-bool removeAttribute(const QString &path, const QString &attribute)
-{
-
-    QString candidateProgram = QStandardPaths::findExecutable("rmextattr"); // FreeBSD
-    if (candidateProgram.isEmpty())
-        QStandardPaths::findExecutable("removexattr"); // Linux
-    if (candidateProgram.isEmpty()) {
-        qCritical() << "Did not find rmextattr nor removexattr, cannot remove extended attribute";
-        return false;
-    }
-    QProcess p;
-    p.setProgram(QStandardPaths::findExecutable(candidateProgram));
-    p.setArguments({ "user", attribute, path });
-    p.start();
-    p.waitForFinished();
-    if (p.exitCode() != 0) {
-        qDebug() << "Failed to run command:" << p.program() << p.arguments();
-        return false;
-    }
-    return true;
-
-    // The following does not work on read-only files, e.g., at /usr
-    // #if defined(BSD)
-    //   ssize_t bytesRemoved = extattr_delete_file(path.toLatin1().data(), EXTATTR_NAMESPACE_USER,
-    //                                              attribute.toLatin1().data());
-    //   // check if we removed the attribute
-    //   return (bytesRemoved == 0);
-    // #else
-    //   QString namespacedAttr;
-    //   namespacedAttr.append(XATTR_NAMESPACE).append(".").append(attribute);
-    //   ssize_t bytesRemoved =
-    //           removexattr(path.toLatin1().data(), namespacedAttr.toLatin1().data());
-    //   // check if we removed the attribute
-    //   return (bytesRemoved == 0);
-    // #endif
-}
-
-/*
  * get the attibute value from the extended attribute for the path as QString
  */
 QString getAttributeValueQString(const QString &path, const QString &attribute, bool &ok)
@@ -182,33 +142,6 @@ bool setAttributeValueQString(const QString &path, const QString &attribute, con
     //   // check if we set the attribute value
     //   return (success == 0);
     // #endif
-}
-
-bool hasAttribute(const QString &path, const QString &attribute)
-{
-    // Use lsextattr or lsexattr to check if the attribute exists
-    // If the attribute exists, the exit code is true
-    // If the attribute does not exist, the exit code is false
-    QString candidateProgram = QStandardPaths::findExecutable("lsextattr"); // FreeBSD
-    if (candidateProgram.isEmpty())
-        QStandardPaths::findExecutable("listxattr"); // Linux
-    if (candidateProgram.isEmpty()) {
-        qCritical() << "Did not find lsextattr nor listxattr, cannot check extended attribute";
-        return false;
-    }
-    QProcess p;
-    p.setProgram(QStandardPaths::findExecutable(candidateProgram));
-    p.setArguments({ "user", path });
-    p.start();
-    p.waitForFinished();
-    if (p.exitCode() != 0) {
-        qDebug() << "Failed to run command:" << p.program() << p.arguments();
-        return false;
-    }
-    const QString output = QString::fromLocal8Bit(p.readAllStandardOutput());
-    const QStringList attributes = output.split('\n');
-    return attributes.contains(attribute);
-
 }
 
 } // namespace Fm

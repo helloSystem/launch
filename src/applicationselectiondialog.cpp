@@ -208,17 +208,14 @@ QString ApplicationSelectionDialog::getSelectedApplication()
 
     } else if (ui->checkBoxAlwaysOpenAll->isChecked()) {
         
-        // Clear the open-with extended attribute if it exists
+        // Clear the open-with extended attribute if it exists by setting it to NULL
         bool ok = false;
-        if (Fm::hasAttribute(*fileOrProtocol, "open-with")) {
-            qDebug() << "Clearing open-with extended attribute";
-            ok = Fm::removeAttribute(*fileOrProtocol, "open-with");
-            if (!ok) {
-                QMessageBox msgBox;
-                msgBox.setIcon(QMessageBox::Critical);
-                msgBox.setText("Could not clear the 'open-with' extended attribute");
-                msgBox.exec();
-            }
+        ok = Fm::setAttributeValueQString(*fileOrProtocol, "open-with", NULL);
+        if (!ok) {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Critical);
+            msgBox.setText("Could not clear the 'open-with' extended attribute");
+            msgBox.exec();
         }
         
         qDebug() << "Creating default symlink for this MIME type";
@@ -258,7 +255,7 @@ QString ApplicationSelectionDialog::getSelectedApplication()
             }
         }
 
-        qDebug() << "Creating default symlink";
+        qDebug() << "Creating default symlink from %s to %s" << appPath << defaultPath;
 
         // Create the symlink
         ok = false;
