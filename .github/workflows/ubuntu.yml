@@ -25,7 +25,7 @@ jobs:
           mkdir build ; cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
-          make DESTDIR=. install
+          make DESTDIR=launch install
           find launch/
           zip --symlinks -r ./launch_Ubuntu.zip launch/
 
