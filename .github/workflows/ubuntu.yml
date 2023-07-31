@@ -25,10 +25,9 @@ jobs:
           mkdir build ; cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
-          mkdir -p launch/usr/local/bin/
-          make DESTDIR=launch install
-          find launch/
-          zip --symlinks -r ./launch_Ubuntu.zip launch/
+          make DESTDIR=out install
+          find out/
+          zip --symlinks -r ./launch_Ubuntu.zip out/
 
       - name: Upload Ubuntu artifact
         uses: actions/upload-artifact@v2
