@@ -1,0 +1,36 @@
+name: Build for Ubuntu
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build_ubuntu:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies for Ubuntu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git curl wget zip cmake pkgconf libqt5widgets5 qttools5-dev libkf5windowsystem-dev
+
+      - name: Build and package for Ubuntu
+        run: |
+          git submodule update --init --recursive
+          mkdir build ; cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          make DESTDIR=. install
+          find launch/
+          zip --symlinks -r ./launch_Ubuntu.zip launch/
+
+      - name: Upload Ubuntu artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: launch-artifact-ubuntu
+          path: build/launch_Ubuntu.zip
