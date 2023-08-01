@@ -651,6 +651,13 @@ int Launcher::open(QStringList args)
             }
         }
 
+        // Do not open .desktop files; instead, launch them
+        if (mimeType == "application/x-desktop") {
+            QStringList argsForLaunch = { firstArg };
+            argsForLaunch.append(args);
+            return launch(argsForLaunch);
+        }
+
         // Check whether there is a symlink in ~/.local/share/launch/MIME/<...>/Default
         // pointing to an application that exists on disk; if yes, then use that
         if (!showChooserRequested) {
