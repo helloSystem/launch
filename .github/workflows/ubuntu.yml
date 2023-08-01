@@ -27,7 +27,7 @@ jobs:
           make -j$(nproc)
           make DESTDIR=out install
           find out/
-          zip --symlinks -r ./launch_Ubuntu.zip out/
+          cd out/ && zip --symlinks -r ../launch_Ubuntu.zip . && cd -
 
       - name: Upload Ubuntu artifact
         uses: actions/upload-artifact@v2
