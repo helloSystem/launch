@@ -1,6 +1,10 @@
 # launch [![Build Status](https://api.cirrus-ci.com/github/helloSystem/launch.svg)](https://cirrus-ci.com/github/helloSystem/launch)
 
-Command line tools (`launch`, `open`,...) to launch applications and open documents (and protocols). Will first search `$PATH` and then `.app` bundles and `.AppDir` directories using the launch "database", and will show launch errors in the GUI. GUI applications in helloSystem like like Filer, Dock, and other applications use these tools to launch applications and open documents (and protocols). The command line tools can also be invoked directly from the command line.
+Command line tools (`launch`, `open`,...) to launch applications and open documents (and protocols). Will first search `$PATH` and then `.app` bundles and `.AppDir` directories using the launch "database", and will show launch errors in the GUI. GUI applications in [helloSystem](https://hellosystem.github.io/) like like Filer, Menu, and other applications use these tools to launch applications and open documents (and protocols). The command line tools can also be invoked directly from the command line.
+
+The use of XDG standards relating to launching applications and opening documents (and protocols) is only supported to a certain extent to provide smooth backward compatibility to legacy applications, but is otherwise discouraged.
+
+While the tools are developed with helloSystem in mind, they are also built and occasionally tested on Linux to ensure platform independence.
 
 ## Build
 
