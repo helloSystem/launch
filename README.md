@@ -1,6 +1,6 @@
 # launch [![Build Status](https://api.cirrus-ci.com/github/helloSystem/launch.svg)](https://cirrus-ci.com/github/helloSystem/launch)
 
-Command line tool to launch applications, will first search `$PATH` and then `.app` bundles and `.AppDir` directories in various directories, and will show launch errors in the GUI. Filer, Dock, and other applications are supposed to use `launch` to launch applications. It can also be invoked from the command line.
+Command line tools (`launch`, `open`,...) to launch applications and open documents (and protocols). Will first search `$PATH` and then `.app` bundles and `.AppDir` directories using the launch "database", and will show launch errors in the GUI. GUI applications in helloSystem like like Filer, Dock, and other applications use these tools to launch applications and open documents (and protocols). The command line tools can also be invoked directly from the command line.
 
 ## Build
 
@@ -15,6 +15,21 @@ mkdir build
 cd build
 cmake ..
 make
+```
+
+## Launch "database"
+
+The tools use a filesystem-based "database" to look up which applications should be launched to open documents (or protocols) of certain (MIME) types.
+
+Currently the implementation is like this:
+
+```
+~/.local/share/launch/Applications
+~/.local/share/launch/MIME
+~/.local/share/launch/MIME/x-scheme-handler_https
+~/.local/share/launch/MIME/x-scheme-handler_https/Chromium.app
+~/.local/share/launch/MIME/x-scheme-handler_https/firefox.desktop
+~/.local/share/launch/MIME/x-scheme-handler_https/Default # Symlink to the default application for this MIME type
 ```
 
 ## Types of error messages
