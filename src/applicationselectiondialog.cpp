@@ -21,11 +21,13 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
     ui->setupUi(this);
     ui->label->setText(QString("Please choose an application to open \n'%1'\nof type '%2':")
                                .arg(*fileOrProtocol)
-                               .arg(*mimeType));
+                               .arg(*mimeType).replace("_", "/"));
 
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(ui->listWidget, &QListWidget::doubleClicked, this, &QDialog::accept);
+
+    this->setWindowTitle(tr("Open With"));
 
     ui->checkBoxAlwaysOpenThis->setEnabled(false);
     ui->checkBoxAlwaysOpenAll->setEnabled(false);
@@ -65,14 +67,6 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
                      [](const QString &a, const QString &b) {
                          return a.endsWith(".desktop") < b.endsWith(".desktop");
                      });
-
-    // Remove entries with the filename "Default" from appCandidates
-    for (auto r = 0; r < appCandidates->length(); r++) {
-        if (QFileInfo(appCandidates->at(r)).fileName() == "Default") {
-            appCandidates->removeAt(r);
-            r--;
-        }
-    }
 
     // If there are no appCandidates, then search for applications that can open the MIME type
     // up to the "_" part; e.g., if we have no candidates for "text_plain", then search for
@@ -137,8 +131,16 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
     // Print number of appCandidates
     qDebug() << "Found" << appCandidates->length() << "candidates for" << *mimeType;
 
-    // Remove duplicates from appCandidates
-    appCandidates->removeDuplicates();
+    // Remove duplicates from appCandidates. For each candidate, resolve the symlink (if it is one)
+    // Once we have resolved all symlinks, we can remove duplicates by comparing the resolved
+    // paths
+    QStringList *appCandidatesResolved = new QStringList();
+    for (auto r = 0; r < appCandidates->length(); r++) {
+        // Get canonical path of appCandidates->at(r) and if it is a symlink, resolve it
+        QString appCandidateResolved = QFileInfo(appCandidates->at(r)).canonicalFilePath();
+        appCandidatesResolved->append(appCandidateResolved);
+    }
+    *appCandidates = appCandidatesResolved->toSet().toList();
 
     // Print number of appCandidates
     qDebug() << "Found" << appCandidates->length() << "candidates for" << *mimeType;
