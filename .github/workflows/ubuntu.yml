@@ -34,3 +34,19 @@ jobs:
         with:
           name: launch-artifact-ubuntu
           path: build/launch_Ubuntu.zip
+          
+      - name: Create GitHub Release using Continuous Release Manager
+        if: github.event_name == 'push'  # Only run for push events, not pull requests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -L -o continuous-release-manager-linux https://github.com/probonopd/continuous-release-manager/releases/download/continuous/continuous-release-manager-linux
+          chmod +x continuous-release-manager-linux
+          ./continuous-release-manager-linux
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'push'  # Only run for push events, not pull requests
+        run: |
+          gh release upload continuous ./build/launch_Ubuntu.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
