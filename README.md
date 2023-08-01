@@ -31,8 +31,10 @@ Currently the implementation is like this:
 ~/.local/share/launch/Applications
 ~/.local/share/launch/MIME
 ~/.local/share/launch/MIME/x-scheme-handler_https
+# The following entries get populated automatically whenever the system "sees" an application
 ~/.local/share/launch/MIME/x-scheme-handler_https/Chromium.app
 ~/.local/share/launch/MIME/x-scheme-handler_https/firefox.desktop
+# The following entries do not get populated automatically, but only after the user chooses a default application for a (MIME) type
 ~/.local/share/launch/MIME/x-scheme-handler_https/Default # Symlink to the default application for this MIME type
 ```
 
