@@ -5,9 +5,14 @@
 #include "extattrs.h"
 #include <QDir>
 #include <QMessageBox>
+#include <QPushButton>
+#include "launcher.h"
+#include "dbmanager.h"
+#include <QFileDialog>
+
 
 ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, QString *mimeType,
-                                                       bool showAlsoLegacyCandidates,
+                                                       bool showAlsoLegacyCandidates, bool showAllCandidates,
                                                        QWidget *parent)
     : QDialog(parent), ui(new Ui::ApplicationSelectionDialog)
 {
@@ -26,6 +31,40 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(ui->listWidget, &QListWidget::doubleClicked, this, &QDialog::accept);
+
+    // Add a "Cancel" button
+    QPushButton *cancelButton = new QPushButton(tr("Cancel"));
+    cancelButton->setCheckable(true);
+    cancelButton->setAutoExclusive(true);
+    cancelButton->setAutoDefault(false);
+    ui->buttonBox->addButton(cancelButton, QDialogButtonBox::RejectRole);
+
+    // Add a button "Other..." that lets the user select an application not in the list
+    QPushButton *openWithButton = new QPushButton(tr("Other..."));
+    openWithButton->setCheckable(true);
+    openWithButton->setAutoExclusive(true);
+    openWithButton->setAutoDefault(false);
+    ui->buttonBox->addButton(openWithButton, QDialogButtonBox::ActionRole);
+    connect(openWithButton, &QPushButton::clicked, [=]() {
+    QFileDialog fileDialog;
+    fileDialog.setFileMode(QFileDialog::Directory);
+    fileDialog.setFileMode(QFileDialog::AnyFile);
+    fileDialog.setDirectory(DbManager::localShareLaunchApplicationsPath);
+    if (fileDialog.exec()) {
+        // Get the selected file or directory
+        QStringList selectedFiles = fileDialog.selectedFiles();
+        if (selectedFiles.size() == 1) {
+            QString selectedFile = selectedFiles.at(0);
+            QStringList args;
+            args << QFileInfo(selectedFile).absoluteFilePath();
+            args << *fileOrProtocol;
+            Launcher launcher;
+            launcher.launch(args);
+            QApplication::quit();
+        }
+    }
+        
+    });
 
     this->setWindowTitle(tr("Open With"));
 
@@ -60,12 +99,24 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
         dir.mkpath(".");
     }
 
-    // Populate appCandidates with the syminks at mimePath
-    appCandidates =
-            new QStringList(QDir(mimePath).entryList(QDir::NoDotAndDotDot | QDir::AllEntries));
-    // Prepend each candidate with the path at which it was found
-    for (auto r = 0; r < appCandidates->length(); r++) {
-        appCandidates->replace(r, QString("%1/%2").arg(mimePath).arg(appCandidates->at(r)));
+    if (showAllCandidates == true) {
+        qDebug() << "Control modifier pressed, showing all applications";
+        // Get all applications known to the system
+        db = new DbManager();
+        appCandidates = new QStringList(db->allApplications());
+        delete db;
+        showAlsoLegacyCandidates = true;
+    } else {
+        // Normal operation
+        // Populate appCandidates with the syminks at mimePath
+        qDebug() << "Normal operation (no modifier key is pressed) showing only applications for" << *mimeType;
+        appCandidates =
+                new QStringList(QDir(mimePath).entryList(QDir::NoDotAndDotDot | QDir::AllEntries));
+        // Prepend each candidate with the path at which it was found
+        for (auto r = 0; r < appCandidates->length(); r++) {
+            appCandidates->replace(r, QString("%1/%2").arg(mimePath).arg(appCandidates->at(r)));
+        }
+
     }
 
     // Order apppCandidates by name and put ones ending in .desktop last
@@ -177,6 +228,7 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
     qDebug() << "Found" << desktopFilesCount << "desktop files";
     // Print whether showAlsoLegacyCandidates is true or false
     qDebug() << "showAlsoLegacyCandidates:" << showAlsoLegacyCandidates;
+    qDebug() << "showAllCandidates:" << showAllCandidates;
 
     if (!showAlsoLegacyCandidates && preferredAppCandidates->length() > 0) {
         // Use preferredAppCandidates instead of appCandidates

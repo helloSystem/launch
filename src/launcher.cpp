@@ -110,7 +110,6 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString)
             }
         }
 
-        qDebug() << "Alive?" << lines.length();
         QString cleartextString = "";
         for (int i = 0; i < 10; i++) {
             if (i < lines.length()) {
@@ -754,7 +753,7 @@ int Launcher::open(QStringList args)
 
             if (showChooserRequested || appCandidates.length() < 1) {
                 ApplicationSelectionDialog *dlg =
-                        new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, false, nullptr);
+                        new ApplicationSelectionDialog(&fileOrProtocol, &mimeType, true, false, nullptr);
                 auto result = dlg->exec();
                 if (result == QDialog::Accepted)
                     appToBeLaunched = dlg->getSelectedApplication();
