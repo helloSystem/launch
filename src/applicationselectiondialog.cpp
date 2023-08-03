@@ -53,6 +53,13 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
                                .arg(DbManager::localShareLaunchMimePath)
                                .arg(QString(*mimeType).replace("/", "_"));
 
+    // Create the directory if it doesn't exist so that it is easier to
+    // manually add applications to it
+    QDir dir(mimePath);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+
     // Populate appCandidates with the syminks at mimePath
     appCandidates =
             new QStringList(QDir(mimePath).entryList(QDir::NoDotAndDotDot | QDir::AllEntries));
