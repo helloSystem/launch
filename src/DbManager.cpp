@@ -1,4 +1,4 @@
-#include "dbmanager.h"
+#include "DbManager.h"
 #include <QDebug>
 #include <QDir>
 #include <QDirIterator>

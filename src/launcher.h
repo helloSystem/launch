@@ -28,9 +28,9 @@
 
 #include <KF5/KWindowSystem/KWindowSystem>
 
-#include "dbmanager.h"
-#include "applicationinfo.h"
-#include "appdiscovery.h"
+#include "DbManager.h"
+#include "ApplicationInfo.h"
+#include "AppDiscovery.h"
 #include "extattrs.h"
 
 class QDetachableProcess : public QProcess

@@ -1,5 +1,5 @@
-#include "applicationselectiondialog.h"
-#include "ui_applicationselectiondialog.h"
+#include "ApplicationSelectionDialog.h"
+#include "ui_ApplicationSelectionDialog.h"
 #include <QDebug>
 
 #include "extattrs.h"
@@ -7,7 +7,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include "launcher.h"
-#include "dbmanager.h"
+#include "DbManager.h"
 #include <QFileDialog>
 
 

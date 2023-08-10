@@ -3,7 +3,7 @@
 #include <QDir>
 #include <QStandardPaths>
 
-#include "dbmanager.h"
+#include "DbManager.h"
 
 int main(int argc, char *argv[])
 {

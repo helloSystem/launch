@@ -3,6 +3,9 @@
 
 cmake_minimum_required(VERSION 3.5)
 
+# Add the tests subdirectory
+add_subdirectory(tests)
+
 # Do not print deprecated warnings for Qt5 or KF5
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 
@@ -36,53 +39,65 @@ set(CMAKE_INSTALL_RPATH $ORIGIN/../lib)
 # 'launch' binary in different paths
 add_executable(launch
   src/launch.cpp
-  src/dbmanager.h
-  src/dbmanager.cpp
-  src/applicationinfo.h
-  src/applicationinfo.cpp
-  src/appdiscovery.h
-  src/appdiscovery.cpp
+        src/DbManager.h
+        src/DbManager.cpp
+        src/ApplicationInfo.h
+        src/ApplicationInfo.cpp
+        src/AppDiscovery.h
+        src/AppDiscovery.cpp
   src/extattrs.h
   src/extattrs.cpp
   src/launcher.h
   src/launcher.cpp
-  src/applicationselectiondialog.h src/applicationselectiondialog.cpp src/applicationselectiondialog.ui
+        src/ApplicationSelectionDialog.h
+        src/ApplicationSelectionDialog.cpp
+        src/ApplicationSelectionDialog.ui
+  src/Executable.cpp
+  src/Executable.h
 )
 
 add_executable(open
   src/launch.cpp
-  src/dbmanager.h
-  src/dbmanager.cpp
-  src/applicationinfo.h
-  src/applicationinfo.cpp
-  src/appdiscovery.h
-  src/appdiscovery.cpp
+        src/DbManager.h
+        src/DbManager.cpp
+        src/ApplicationInfo.h
+        src/ApplicationInfo.cpp
+        src/AppDiscovery.h
+        src/AppDiscovery.cpp
   src/extattrs.h
   src/extattrs.cpp
   src/launcher.h
   src/launcher.cpp
-  src/applicationselectiondialog.h src/applicationselectiondialog.cpp src/applicationselectiondialog.ui
+        src/ApplicationSelectionDialog.h
+        src/ApplicationSelectionDialog.cpp
+        src/ApplicationSelectionDialog.ui
+  src/Executable.cpp
+  src/Executable.h
 )
 
 add_executable(xdg-open
   src/launch.cpp
-  src/dbmanager.h
-  src/dbmanager.cpp
-  src/applicationinfo.h
-  src/applicationinfo.cpp
-  src/appdiscovery.h
-  src/appdiscovery.cpp
+        src/DbManager.h
+        src/DbManager.cpp
+        src/ApplicationInfo.h
+        src/ApplicationInfo.cpp
+        src/AppDiscovery.h
+        src/AppDiscovery.cpp
   src/extattrs.h
   src/extattrs.cpp
   src/launcher.h
   src/launcher.cpp
-  src/applicationselectiondialog.h src/applicationselectiondialog.cpp src/applicationselectiondialog.ui
+        src/ApplicationSelectionDialog.h
+        src/ApplicationSelectionDialog.cpp
+        src/ApplicationSelectionDialog.ui
+  src/Executable.cpp
+  src/Executable.h
 )
 
 add_executable(bundle-thumbnailer
   src/bundle-thumbnailer.cpp
-  src/dbmanager.h
-  src/dbmanager.cpp
+        src/DbManager.h
+        src/DbManager.cpp
   src/extattrs.h
   src/extattrs.cpp
 )

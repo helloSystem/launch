@@ -3,7 +3,7 @@
 
 #include <QDialog>
 #include <QListWidget>
-#include "dbmanager.h"
+#include "DbManager.h"
 
 namespace Ui {
 class ApplicationSelectionDialog;

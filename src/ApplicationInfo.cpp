@@ -1,4 +1,4 @@
-#include "applicationinfo.h"
+#include "ApplicationInfo.h"
 #include <KWindowInfo>
 #include <QDebug>
 #include <QStringList>
@@ -26,41 +26,36 @@ ApplicationInfo::~ApplicationInfo() { }
 
 // Returns the name of the most nested bundle a file is in,
 // or an empty string if the file is not in a bundle
-QString ApplicationInfo::bundlePath(QString path)
+QString ApplicationInfo::bundlePath(const QString &path)
 {
-    QDir(path).cleanPath(path);
+    QString ourPath = path;
+    QDir(path).cleanPath(ourPath);
     // Remove trailing slashes
-    while (path.endsWith("/")) {
-        path.remove(path.length() - 1, 1);
+    while (ourPath.endsWith("/")) {
+        ourPath.remove(path.length() - 1, 1);
     }
-    if (path.endsWith(".app")) {
-        return path;
-    } else if (path.contains(".app/")) {
-        QStringList parts = path.split(".app");
+    if (ourPath.endsWith(".app")) {
+        return ourPath;
+    } else if (ourPath.contains(".app/")) {
+        QStringList parts = ourPath.split(".app");
         parts.removeLast();
         return parts.join(".app");
-    } else if (path.endsWith(".AppDir")) {
-        return path;
-    } else if (path.contains(".AppDir/")) {
-        QStringList parts = path.split(".AppDir");
+    } else if (ourPath.endsWith(".AppDir")) {
+        return ourPath;
+    } else if (ourPath.contains(".AppDir/")) {
+        QStringList parts = ourPath.split(".AppDir");
         parts.removeLast();
         return parts.join(".AppDir");
-    } else if (path.endsWith(".AppImage")) {
-        return path;
-    } else if (path.endsWith(".desktop")) {
-        return path;
+    } else if (ourPath.endsWith(".AppImage")) {
+        return ourPath;
+    } else if (ourPath.endsWith(".desktop")) {
+        return ourPath;
     } else {
         return "";
     }
 }
 
-// Returns the name of the bundle
-QString ApplicationInfo::bundleName(unsigned long long id)
-{
-    return "";
-}
-
-QString ApplicationInfo::applicationNiceNameForPath(QString path)
+QString ApplicationInfo::applicationNiceNameForPath(const QString &path)
 {
     QString applicationNiceName;
     QString bp = bundlePath(path);

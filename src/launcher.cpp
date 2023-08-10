@@ -1,10 +1,11 @@
 #include "launcher.h"
-#include "applicationselectiondialog.h"
+#include "ApplicationSelectionDialog.h"
 #include <unistd.h>
 #include <QApplication>
 #include <NETWM>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
+#include "Executable.h"
 
 Launcher::Launcher() : db(new DbManager()) { }
 
@@ -184,9 +185,21 @@ QStringList Launcher::executableForBundleOrExecutablePath(QString bundleOrExecut
             } else {
                 executableAndArgs = execStringAndArgs;
             }
-        } else if (info.isExecutable() && !info.isDir()) {
-            qDebug() << "# Found executable" << bundleOrExecutablePath;
-            executableAndArgs = QStringList({ bundleOrExecutablePath });
+        } else if (!info.isDir()) {
+            if(Executable::hasShebangOrIsElf(bundleOrExecutablePath)) {
+                if(info.isExecutable()) {
+                    qDebug() << "# Found executable" << bundleOrExecutablePath;
+                    executableAndArgs = QStringList({ bundleOrExecutablePath });
+                } else {
+                    qDebug() << "# Found non-executable" << bundleOrExecutablePath;
+                    bool success = Executable::askUserToMakeExecutable(bundleOrExecutablePath);
+                    if (!success) {
+                        exit(1);
+                    } else {
+                        executableAndArgs = QStringList({ bundleOrExecutablePath });
+                    }
+                }
+            }
         }
     }
     return executableAndArgs;
@@ -194,12 +207,15 @@ QStringList Launcher::executableForBundleOrExecutablePath(QString bundleOrExecut
 
 QString Launcher::pathWithoutBundleSuffix(QString path)
 {
-    // FIXME: This is very lazy; TODO: Do it properly
-    return path.replace(".AppDir", "")
-            .replace(".app", "")
-            .replace(".desktop", "")
-            .replace(".AppImage", "")
-            .replace(".appimage", "");
+    // List of common bundle suffixes to remove
+    QStringList bundleSuffixes = { ".AppDir", ".app", ".desktop", ".AppImage", ".appimage" };
+
+    QString cleanedPath = path;
+    for (const QString &suffix : bundleSuffixes) {
+        cleanedPath = cleanedPath.remove(QRegularExpression(suffix, QRegularExpression::CaseInsensitiveOption));
+    }
+
+    return cleanedPath;
 }
 
 int Launcher::launch(QStringList args)
@@ -377,11 +393,10 @@ int Launcher::launch(QStringList args)
     if (args.length() < 1 && env.contains("LAUNCHED_BUNDLE") && (firstArg != "Menu")) {
         qDebug() << "# Checking for existing windows";
         const auto &windows = KWindowSystem::windows();
-        ApplicationInfo *ai = new ApplicationInfo();
         bool foundExistingWindow = false;
         for (WId wid : windows) {
 
-            QString runningBundle = ai->bundlePathForWId(wid);
+            QString runningBundle = ApplicationInfo::bundlePathForWId(wid);
             if (runningBundle == env.value("LAUNCHED_BUNDLE")) {
                 // Check if the user ID which the application is running under is the same user ID as is the current user
                 // This is to avoid bringing to the front windows of other users (e.g., if we want to run as root)
@@ -426,7 +441,6 @@ int Launcher::launch(QStringList args)
             qDebug() << "# Did not find existing windows for LAUNCHED_BUNDLE"
                      << env.value("LAUNCHED_BUNDLE");
         }
-        ai->~ApplicationInfo();
     } else if (args.length() > 1) {
         qDebug() << "# Not checking for existing windows because arguments were "
                     "passed to the application";
@@ -438,9 +452,7 @@ int Launcher::launch(QStringList args)
     p.start();
 
     // Tell Menu that an application is being launched
-    ApplicationInfo *ai = new ApplicationInfo();
-    QString bPath = ai->bundlePath(p.program());
-    ai->~ApplicationInfo();
+    QString bPath = ApplicationInfo::bundlePath(p.program());
 
     // Blocks until process has started
     if (!p.waitForStarted()) {

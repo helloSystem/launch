@@ -1,11 +1,11 @@
-#include "appdiscovery.h"
+#include "AppDiscovery.h"
 
 #include <QDebug>
 #include <QDir>
 #include <QStandardPaths>
 #include <QStringList>
 
-#include "dbmanager.h"
+#include "DbManager.h"
 
 AppDiscovery::AppDiscovery(DbManager *db)
 {
