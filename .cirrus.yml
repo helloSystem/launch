@@ -11,7 +11,7 @@ task:
   auto_cancellation: false
   stateful: false
   setup_script:
-    - pkg install -y curl wget zip pkgconf cmake qt5-qmake qt5-widgets qt5-buildtools kf5-kwindowsystem
+    - pkg install -y curl wget zip pkgconf cmake qt5-qmake qt5-widgets qt5-buildtools kf5-kwindowsystem qt5-testlib
   test_script:
     - mkdir build ; cd build
     - cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
