@@ -58,9 +58,33 @@ ApplicationSelectionDialog::ApplicationSelectionDialog(QString *fileOrProtocol, 
             QStringList args;
             args << QFileInfo(selectedFile).absoluteFilePath();
             args << *fileOrProtocol;
+
+            // Symlink the chosen application to the launch "database"
+            // so that it can be set as the default application later on
+            QString symlinkPath = QString("%1/%2").arg(DbManager::localShareLaunchApplicationsPath).arg(QFileInfo(selectedFile).fileName());
+            if (!QDir(DbManager::localShareLaunchApplicationsPath).exists()) {
+                QDir().mkdir(DbManager::localShareLaunchApplicationsPath);
+            }
+            if (!QFile::exists(symlinkPath)
+                && !QFile::link(selectedFile, symlinkPath)) {
+                QMessageBox::critical(this, tr("Error"), tr("Could not create symlink from %1 to %2").arg(selectedFile).arg(symlinkPath));
+            }
+            // Symlink the chosen application from the symlink we just created to the MIME type path
+            QString mimePath = QString("%1/%2")
+                                       .arg(DbManager::localShareLaunchMimePath)
+                                       .arg(QString(*mimeType).replace("/", "_"));
+            if (!QDir(mimePath).exists()) {
+                QDir().mkdir(mimePath);
+            }
+            QString mimeSymlinkPath = QString("%1/%2").arg(mimePath).arg(QFileInfo(selectedFile).fileName());
+            if (!QFile::exists(mimeSymlinkPath)
+                && !QFile::link(symlinkPath, mimeSymlinkPath)) {
+                QMessageBox::critical(this, tr("Error"), tr("Could not create symlink from %1 to %2").arg(symlinkPath).arg(mimeSymlinkPath));
+            }
+
+            this->hide();
             Launcher launcher;
             launcher.launch(args);
-            QApplication::quit();
         }
     }
         
