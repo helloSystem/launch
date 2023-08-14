@@ -315,7 +315,9 @@ int Launcher::launch(QStringList args)
         execLinePartsFromDesktopFile.pop_front();
         for (const QString execLinePartFromDesktopFile : execLinePartsFromDesktopFile) {
             if (execLinePartFromDesktopFile == "%f" || execLinePartFromDesktopFile == "%u")
-                constructedArgs.append(args[0]);
+                if(args.length() > 1) {
+                    constructedArgs.append(args[0]);
+                }
             else if (execLinePartFromDesktopFile == "%F" || execLinePartFromDesktopFile == "%U")
                 constructedArgs.append(args);
             else
