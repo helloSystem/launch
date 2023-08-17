@@ -650,6 +650,18 @@ int Launcher::open(QStringList args)
             mimeType = "text/plain";
         }
 
+        // If is an ELF binary, check if it is executable using "Executable.h"
+        if (mimeType == "application/x-executable") {
+            if (!Executable::isExecutable(firstArg)) {
+                bool yes = Executable::askUserToMakeExecutable(firstArg);
+                if (yes) {
+                    launch({ firstArg });
+                } else {
+                    exit(1);
+                }
+            }
+        }
+
         qDebug() << "File to be opened has MIME type:" << mimeType;
 
         // Do not attempt to open file types which are known to have no useful

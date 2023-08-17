@@ -30,7 +30,11 @@ bool Executable::isElf(const QString& path) {
     QMimeDatabase mimeDatabase;
     QMimeType mimeType = mimeDatabase.mimeTypeForFile(path);
 
-    if (mimeType.isValid() && mimeType.name().startsWith("application/x-executable")) {
+    QStringList allMimeTypeNames = {mimeType.name()};
+    allMimeTypeNames.append(mimeType.allAncestors());
+    // qDebug() << "All MIME types for file:" << allMimeTypeNames;
+
+    if (allMimeTypeNames.contains("application/x-executable")) {
         qDebug() << "File is an ELF executable.";
         return true;
     } else {
@@ -47,11 +51,12 @@ bool Executable::askUserToMakeExecutable(const QString& path) {
                                                                    QMessageBox::Yes | QMessageBox::No);
 
         if (response == QMessageBox::Yes) {
+
             QProcess process;
             QStringList arguments;
-            arguments << "-A" << "-E" << "chmod" << "+x" << path;
+            arguments << "+x" << path;
 
-            process.setProgram("sudo");
+            process.setProgram("chmod");
             process.setArguments(arguments);
 
             process.start();
