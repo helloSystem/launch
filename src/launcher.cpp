@@ -367,16 +367,6 @@ int Launcher::launch(QStringList args)
     env.insert("LAUNCHED_EXECUTABLE", executable);
     QFileInfo info = QFileInfo(executable);
 
-    /*
-    // Hackish workaround; TODO: Replace by something cleaner
-    if (executable.toLower().endsWith(".appimage")) {
-        if (!info.isExecutable()) {
-            p.setProgram("runappimage");
-            args.insert(0, executable);
-        }
-    }
-    */
-
     p.setArguments(args);
 
     // Hint: LAUNCHED_EXECUTABLE and LAUNCHED_BUNDLE environment variables
@@ -601,6 +591,26 @@ int Launcher::open(QStringList args)
 
     QString firstArg = args.first();
     qDebug() << "open firstArg:" << firstArg;
+
+    // Workaround for FreeBSD not being able to properly mount all AppImages
+    // by using the "runappimage" helper that mounts the AppImage and then
+    // executes its payload.
+    // FIXME: This should go away as soon as possible.
+
+    if (QSysInfo::kernelType() == "freebsd") {
+        // Check if we have the "runappimage" helper
+        QString runappimage = QStandardPaths::findExecutable("runappimage");
+        qDebug() << "runappimage:" << runappimage;
+        if (! runappimage.isEmpty()) {
+            if (firstArg.toLower().endsWith(".appimage")) {
+                QFileInfo info = QFileInfo(firstArg);
+                if (!info.isExecutable()) {
+                    args.insert(0, runappimage);
+                    firstArg = args.first();
+                }
+            }
+        }
+    }
 
     QString appToBeLaunched = nullptr;
     QStringList
