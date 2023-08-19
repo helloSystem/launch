@@ -315,11 +315,13 @@ int Launcher::launch(QStringList args)
         execLinePartsFromDesktopFile.pop_front();
         for (const QString &execLinePartFromDesktopFile : execLinePartsFromDesktopFile) {
             if (execLinePartFromDesktopFile == "%f" || execLinePartFromDesktopFile == "%u") {
-                if (args.length() > 1) {
+                if (args.length() > 0) {
                     constructedArgs.append(args[0]);
                 }
             } else if (execLinePartFromDesktopFile == "%F" || execLinePartFromDesktopFile == "%U") {
-                constructedArgs.append(args);
+                if (args.length() > 0) {
+                    constructedArgs.append(args);
+                }
             } else {
                 constructedArgs.append(execLinePartFromDesktopFile);
             }
