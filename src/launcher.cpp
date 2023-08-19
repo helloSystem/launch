@@ -244,8 +244,21 @@ int Launcher::launch(QStringList args)
     //    /Applications/libreoffice
 
     QStringList e = executableForBundleOrExecutablePath(firstArg);
-    if (e.length() > 0)
+    if (e.length() > 0) {
         executable = e.first();
+        // Non-executable files should be handled by the open command, not the launch command.
+        // But just in case, we check whether the file is lacking the executable bit.
+        if(Executable::hasShebangOrIsElf(executable)) {
+            QFileInfo info = QFileInfo(executable);
+            if(! info.isExecutable()) {
+                qDebug() << "# Found non-executable" << executable;
+                bool success = Executable::askUserToMakeExecutable(executable);
+                if (!success) {
+                    exit(1);
+                }
+            }
+        }
+    }
 
     // Second, try to find an executable file on the $PATH
     if (executable == nullptr) {
@@ -315,13 +328,11 @@ int Launcher::launch(QStringList args)
         execLinePartsFromDesktopFile.pop_front();
         for (const QString &execLinePartFromDesktopFile : execLinePartsFromDesktopFile) {
             if (execLinePartFromDesktopFile == "%f" || execLinePartFromDesktopFile == "%u") {
-                if (args.length() > 0) {
+                if (args.length() > 1) {
                     constructedArgs.append(args[0]);
                 }
             } else if (execLinePartFromDesktopFile == "%F" || execLinePartFromDesktopFile == "%U") {
-                if (args.length() > 0) {
-                    constructedArgs.append(args);
-                }
+                constructedArgs.append(args);
             } else {
                 constructedArgs.append(execLinePartFromDesktopFile);
             }
@@ -594,6 +605,24 @@ int Launcher::open(QStringList args)
         exit(1);
     }
 
+    // Check whether the file to be opened is an ELF executable or a script missing the executable bit
+    if(Executable::hasShebangOrIsElf(firstArg)) {
+        QStringList executableAndArgs;
+        QFileInfo info = QFileInfo(firstArg);
+        if(info.isExecutable()) {
+            qDebug() << "# Found executable" << firstArg;
+            exit(launch(args));
+        } else {
+            qDebug() << "# Found non-executable" << firstArg;
+            bool success = Executable::askUserToMakeExecutable(firstArg);
+            if (!success) {
+                exit(1);
+            } else {
+                exit(launch(args));
+            }
+        }
+    }
+
     // Check whether the file to be opened specifies an application it wants to be
     // opened with
     bool ok = false;
@@ -650,18 +679,6 @@ int Launcher::open(QStringList args)
         // ideas, anyone?
         if (mimeType == "application/x-zerosize" || mimeType == "inode/x-empty") {
             mimeType = "text/plain";
-        }
-
-        // If is an ELF binary, check if it is executable using "Executable.h"
-        if (mimeType == "application/x-executable") {
-            if (!Executable::isExecutable(firstArg)) {
-                bool yes = Executable::askUserToMakeExecutable(firstArg);
-                if (yes) {
-                    launch({ firstArg });
-                } else {
-                    exit(1);
-                }
-            }
         }
 
         qDebug() << "File to be opened has MIME type:" << mimeType;

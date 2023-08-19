@@ -32,9 +32,11 @@ bool Executable::isElf(const QString& path) {
 
     QStringList allMimeTypeNames = {mimeType.name()};
     allMimeTypeNames.append(mimeType.allAncestors());
-    // qDebug() << "All MIME types for file:" << allMimeTypeNames;
+    qDebug() << "All MIME types for file:" << allMimeTypeNames;
 
-    if (allMimeTypeNames.contains("application/x-executable")) {
+    if (allMimeTypeNames.contains("application/x-executable") || \
+            allMimeTypeNames.contains("application/x-pie-executable") || \
+            allMimeTypeNames.contains("application/vnd-appimage")) {
         qDebug() << "File is an ELF executable.";
         return true;
     } else {
