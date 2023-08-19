@@ -6,6 +6,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include "Executable.h"
+#include <QMessageBox>
 
 Launcher::Launcher() : db(new DbManager()) { }
 
@@ -183,6 +184,21 @@ QStringList Launcher::executableForBundleOrExecutablePath(QString bundleOrExecut
                                              + bundleOrExecutablePath);
                 exit(1);
             } else {
+                // Get the first element of the list, which is the executable, and look it up on the $PATH
+                QString executable = execStringAndArgs.first();
+                if (! executable.contains("/")) {
+                    QString executablePath = QStandardPaths::findExecutable(executable);
+                    if (executablePath == "") {
+                        QMessageBox::warning(nullptr,
+                                             QApplication::tr("Executable not found"),
+                                             QApplication::tr("Could not find executable %1 on $PATH.\n%2")
+                                                 .arg(executable, bundleOrExecutablePath));
+
+                        exit(1);
+                    }
+                    // Replace the first element of the list with the full path to the executable
+                    execStringAndArgs.replace(0, executablePath);
+                }
                 executableAndArgs = execStringAndArgs;
             }
         } else if (!info.isDir()) {
@@ -246,6 +262,7 @@ int Launcher::launch(QStringList args)
     QStringList e = executableForBundleOrExecutablePath(firstArg);
     if (e.length() > 0) {
         executable = e.first();
+
         // Non-executable files should be handled by the open command, not the launch command.
         // But just in case, we check whether the file is lacking the executable bit.
         if(Executable::hasShebangOrIsElf(executable)) {
@@ -328,11 +345,13 @@ int Launcher::launch(QStringList args)
         execLinePartsFromDesktopFile.pop_front();
         for (const QString &execLinePartFromDesktopFile : execLinePartsFromDesktopFile) {
             if (execLinePartFromDesktopFile == "%f" || execLinePartFromDesktopFile == "%u") {
-                if (args.length() > 1) {
+                if (args.length() > 0) {
                     constructedArgs.append(args[0]);
                 }
             } else if (execLinePartFromDesktopFile == "%F" || execLinePartFromDesktopFile == "%U") {
-                constructedArgs.append(args);
+                if (args.length() > 0) {
+                    constructedArgs.append(args);
+                }
             } else {
                 constructedArgs.append(execLinePartFromDesktopFile);
             }
@@ -348,6 +367,7 @@ int Launcher::launch(QStringList args)
     env.insert("LAUNCHED_EXECUTABLE", executable);
     QFileInfo info = QFileInfo(executable);
 
+    /*
     // Hackish workaround; TODO: Replace by something cleaner
     if (executable.toLower().endsWith(".appimage")) {
         if (!info.isExecutable()) {
@@ -355,6 +375,7 @@ int Launcher::launch(QStringList args)
             args.insert(0, executable);
         }
     }
+    */
 
     p.setArguments(args);
 
