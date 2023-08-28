@@ -14,16 +14,28 @@ bool Executable::isExecutable(const QString& path) {
 
 bool Executable::hasShebang(const QString& path) {
     QFile file(path);
+    qDebug() << "Checking file:" << path;
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qWarning() << "Failed to open file:" << path;
         return false;
     }
 
-    QTextStream in(&file);
-    QString firstLine = in.readLine();
-    file.close();
-
-    return firstLine.startsWith("#!");
+    // Check if the file starts with the shebang sequence
+    QByteArray firstTwoBytes = file.read(2);
+    qDebug() << "First two bytes:" << firstTwoBytes;
+    if (firstTwoBytes == "#!") {
+        qDebug() << "File has a shebang.";
+        // Exception: If the MIME type is e.g., "application/x-raw-disk-image",
+        // then we ignore the shebang
+        if (QMimeDatabase().mimeTypeForFile(path).name().contains("disk-image")) {
+            qDebug() << "File is a disk image, so we ignore the shebang.";
+            return false;
+        }
+        return true;
+    } else {
+        qDebug() << "File does not have a shebang.";
+        return false;
+    }
 }
 
 bool Executable::isElf(const QString& path) {
