@@ -14,6 +14,22 @@ bool Executable::isExecutable(const QString& path) {
 
 bool Executable::hasShebang(const QString& path) {
     QFile file(path);
+    QFileInfo fileInfo(path);
+
+    // If it is a directory, it cannot have a shebang, so return false
+    if (fileInfo.isDir()) {
+        qDebug() << "File is a directory, so it cannot have a shebang.";
+        return false;
+    }
+
+    // If it is a symlink, we need to check the target
+    if (fileInfo.isSymLink()) {
+        qDebug() << "File is a symlink, so we need to check the target.";
+        QString target = fileInfo.symLinkTarget();
+        qDebug() << "Target:" << target;
+        return hasShebang(target);
+    }
+
     qDebug() << "Checking file:" << path;
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qWarning() << "Failed to open file:" << path;
