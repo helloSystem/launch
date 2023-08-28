@@ -3,8 +3,9 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QStandardPaths>
-
+#include <QMessageBox>
 #include "extattrs.h"
+
 
 // Make localShareLaunchApplicationsPath available to other classes
 const QString DbManager::localShareLaunchApplicationsPath =
@@ -126,7 +127,15 @@ void DbManager::handleApplication(QString path)
 {
     QString canonicalPath = QDir(path).canonicalPath();
 
-    if (!(QFileInfo(canonicalPath).isDir() || QFileInfo(canonicalPath).isFile())) {
+    // If it is a symlink, check whether it points to an existing file
+    bool symlinkTargetExists = true;
+    if (QFileInfo(canonicalPath).isSymLink()) {
+        if (!QFileInfo(QFileInfo(canonicalPath).symLinkTarget()).exists()) {
+            symlinkTargetExists = false;
+        }
+    }
+
+    if (! symlinkTargetExists || !(QFileInfo(canonicalPath).isDir() || QFileInfo(canonicalPath).isFile())) {
         qDebug() << canonicalPath << "does not exist, removing from launch.db";
         _removeApplication(canonicalPath);
     } else {
@@ -283,6 +292,39 @@ bool DbManager::_removeApplication(const QString &path)
                 success = true;
             } else {
                 qDebug() << "Failed to remove symlink:" << symlinkPath;
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Critical);
+                msgBox.setText("Failed to remove symlink:" + symlinkPath);
+                msgBox.exec();
+            }
+        }
+    }
+
+    // Also remove it from all subdirectories of ~/.local/share/launch/MIME
+    // that contain a symlink to the target
+    QDirIterator it2(localShareLaunchMimePath,
+                     QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it2.hasNext()) {
+        QString mimeDir = it2.next();
+        if (QFileInfo(mimeDir).isDir()) {
+            QDirIterator it3(mimeDir,
+                             QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+            while (it3.hasNext()) {
+                QString symlinkPath = it3.next();
+                if (QFileInfo(symlinkPath).isSymLink()
+                    && QFileInfo(QFileInfo(symlinkPath).symLinkTarget()).canonicalFilePath()
+                            == QFileInfo(path).canonicalFilePath()) {
+                    if (QFile::remove(symlinkPath)) {
+                        qDebug() << "Removed symlink:" << symlinkPath;
+                        success = true;
+                    } else {
+                        qDebug() << "Failed to remove symlink:" << symlinkPath;
+                        QMessageBox msgBox;
+                        msgBox.setIcon(QMessageBox::Critical);
+                        msgBox.setText("Failed to remove symlink:" + symlinkPath);
+                        msgBox.exec();
+                    }
+                }
             }
         }
     }

@@ -296,13 +296,15 @@ QString ApplicationSelectionDialog::getSelectedApplication()
         // Clear the open-with extended attribute if it exists by setting it to NULL
         bool ok = false;
         ok = Fm::setAttributeValueQString(*fileOrProtocol, "open-with", NULL);
+        /*
         if (!ok) {
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Critical);
             msgBox.setText("Could not clear the 'open-with' extended attribute");
             msgBox.exec();
         }
-        
+        */
+
         qDebug() << "Creating default symlink for this MIME type";
         // Use dbmanager to create a symlink in ~/.local/share/launch/MIME/<...>/Default to the
         // selected application
@@ -349,6 +351,7 @@ QString ApplicationSelectionDialog::getSelectedApplication()
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Critical);
             msgBox.setText("Could not create the default symlink");
+            msgBox.setInformativeText(QString("From: %1\nTo: %2").arg(appPath).arg(defaultPath));
             msgBox.exec();
         }
 

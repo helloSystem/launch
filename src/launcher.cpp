@@ -326,6 +326,9 @@ int Launcher::launch(QStringList args)
                                  QString("The application '%1'\ncan't be launched "
                                          "because it can't be found.")
                                          .arg(firstArg));
+            // Remove the application from launch.db if the symlink points to a non-existing file
+            db->handleApplication(firstArg);
+
             exit(1);
         } else {
             QStringList e = executableForBundleOrExecutablePath(selectedBundle);
