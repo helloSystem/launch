@@ -28,15 +28,12 @@ bool Executable::hasShebang(const QString& path) {
 
 bool Executable::isElf(const QString& path) {
     QMimeDatabase mimeDatabase;
-    QMimeType mimeType = mimeDatabase.mimeTypeForFile(path);
-
-    QStringList allMimeTypeNames = {mimeType.name()};
-    allMimeTypeNames.append(mimeType.allAncestors());
-    qDebug() << "All MIME types for file:" << allMimeTypeNames;
-
-    if (allMimeTypeNames.contains("application/x-executable") || \
-            allMimeTypeNames.contains("application/x-pie-executable") || \
-            allMimeTypeNames.contains("application/vnd-appimage")) {
+    QString mimeType = mimeDatabase.mimeTypeForFile(path).name();
+    // NOTE: Not all "application/..." mime types are ELF executables, e.g., disk images
+    // have "application/..." mime types, too.
+    if (mimeType == "application/x-executable" || \
+        mimeType == "application/x-pie-executable" || \
+        mimeType == "application/vnd-appimage") {
         qDebug() << "File is an ELF executable.";
         return true;
     } else {
