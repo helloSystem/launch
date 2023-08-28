@@ -620,7 +620,7 @@ int Launcher::open(QStringList args)
             removalCandidates = {}; // For applications that possibly don't exist on disk anymore
 
     // NOTE: magnet:?xt=urn:btih:... URLs do not contain ":/"
-    if ((!QFileInfo::exists(firstArg)) && (!firstArg.contains(":/"))
+    if (!showChooserRequested && (!QFileInfo::exists(firstArg)) && (!firstArg.contains(":/"))
         && (!firstArg.contains(":?"))) {
         if (QFileInfo(firstArg).isSymLink()) {
             // Broken symlink
@@ -640,7 +640,7 @@ int Launcher::open(QStringList args)
     }
 
     // Check whether the file to be opened is an ELF executable or a script missing the executable bit
-    if(Executable::hasShebangOrIsElf(firstArg)) {
+    if(!showChooserRequested && Executable::hasShebangOrIsElf(firstArg)) {
         QStringList executableAndArgs;
         QFileInfo info = QFileInfo(firstArg);
         if(info.isExecutable()) {
