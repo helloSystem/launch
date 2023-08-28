@@ -103,21 +103,21 @@ add_executable(bundle-thumbnailer
 )
 
 if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-target_link_libraries(launch Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem procstat)
-target_link_libraries(open Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem procstat)
+target_link_libraries(launch   Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem procstat)
+target_link_libraries(open     Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem procstat)
 target_link_libraries(xdg-open Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem procstat)
 endif()
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
-target_link_libraries(launch Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem)
-target_link_libraries(open Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem)
+target_link_libraries(launch   Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem)
+target_link_libraries(open     Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem)
 target_link_libraries(xdg-open Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::DBus KF5::WindowSystem)
 endif()
 
 ADD_CUSTOM_TARGET(link_target ALL
                   COMMAND ${CMAKE_COMMAND} -E create_symlink launch open)
 
-target_link_libraries(bundle-thumbnailer Qt${QT_VERSION_MAJOR}::Core)
+target_link_libraries(bundle-thumbnailer Qt${QT_VERSION_MAJOR}::Widgets)
 
 # Allow for 'make install'
 install(TARGETS launch open bundle-thumbnailer
