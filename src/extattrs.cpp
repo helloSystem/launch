@@ -19,6 +19,10 @@ using namespace Fm;
 namespace Fm {
 
 static const int ATTR_VAL_SIZE = 20480; // FIXME: Can we do without a predetermined size?
+// ANSWER: Yes, by calling extattr_get_file twice; see
+// https://github.com/probonopd/Filer/blob/da3499361150215f9b5dc6cd3d21165a9025e5f5/src/ExtendedAttributes.cpp#L110-L149
+// TODO: Use that
+//
 // If this size is too small, then reading extattr fails, leading to strange unexpected errors
 // including segfaults of 'launch', preventing the desktop from starting up
 // 256 was not enough to read, e.g., 'can-open' containing many MIME types;
