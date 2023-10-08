@@ -357,5 +357,14 @@ QString ApplicationSelectionDialog::getSelectedApplication()
 
     }
 
+    // Touch the file and its parent directory so that Filer updates its icon
+    QFileInfo fileInfo(*fileOrProtocol);
+    if (fileInfo.exists()) {
+    QProcess process;
+        qDebug() << "Touching parent directory: " << fileInfo.dir().path();
+        process.start("touch", QStringList() << fileInfo.dir().path());
+        process.waitForFinished();
+    }
+
     return ui->listWidget->selectedItems().first()->text();
 }

@@ -46,6 +46,9 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString)
 {
     QMessageBox qmesg;
 
+    QFileInfo fi(p->program());
+    QString title = fi.completeBaseName(); // https://doc.qt.io/qt-5/qfileinfo.html#completeBaseName
+
     // Make this error message not appear in the Dock // FIXME: Does not work,
     // why?
     qmesg.setWindowFlag(Qt::SubWindow);
@@ -59,8 +62,7 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString)
 
     QRegExp rx(".*ld-elf.so.1: (.*): version (.*) required by (.*) not found.*");
     QRegExp rxPy(".*ModuleNotFoundError: No module named '(.*)'.*");
-    QFileInfo fi(p->program());
-    QString title = fi.completeBaseName(); // https://doc.qt.io/qt-5/qfileinfo.html#completeBaseName
+
     if (errorString.contains("FATAL: kernel too old")) {
         QString cleartextString =
                 "The Linux compatibility layer reports an older kernel version than "
@@ -78,9 +80,10 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString)
         QFileInfo fileInfo(f.fileName());
         QString outdatedLibShort(fileInfo.fileName());
         QString cleartextString =
-                QString("This application requires at least version %2 of %1 to run.")
-                        .arg(outdatedLibShort)
-                        .arg(versionNeeded);
+                QString("%1 application requires at least version %2 of %3 to run.")
+                        .arg(title)
+                        .arg(versionNeeded)
+                        .arg(outdatedLibShort);
         if (getPackageUpdateCommand(outdatedLib) != "") {
             cleartextString.append(QString("\n\nPlease update it with\n%1\nand try again.")
                                            .arg(getPackageUpdateCommand(outdatedLib)));
@@ -91,13 +94,13 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString)
         qmesg.warning(nullptr, title, cleartextString);
     } else if (rxPy.indexIn(errorString) == 0) {
         QString missingPyModule = rxPy.cap(1);
-        QString cleartextString = QString("This application requires the Python module %1 to "
+        QString cleartextString = QString("%1 requires the Python module %2 to "
                                           "run.\n\nPlease install it and try again.")
+                                          .arg(title)
                                           .arg(missingPyModule);
         qmesg.warning(nullptr, title, cleartextString);
     } else {
-        // Show the first 10 lines of the error message, then ..., then the last 10
-        // lines
+
         QStringList lines = errorString.split("\n");
 
         // Remove all lines from QStringList lines that contain "from LD_PRELOAD
@@ -112,22 +115,23 @@ void Launcher::handleError(QDetachableProcess *p, QString errorString)
             }
         }
 
-        QString cleartextString = "";
-        for (int i = 0; i < 10; i++) {
-            if (i < lines.length()) {
-                cleartextString.append(lines[i] + "\n");
-            }
-        }
+        QString cleartextString = lines.join("\n");
         if (lines.length() > 10) {
-            cleartextString.append("...\n");
 
-            for (int i = lines.length() - 10; i < lines.length(); i++) {
-                if (i < lines.length()) {
-                    cleartextString.append(lines[i] + "\n");
-                }
-            }
+            QString text = QObject::tr(QString("%1 has quit unexpectedly.\n\n\n").arg(title).toUtf8());
+            // Append non-breaking spaces to the text to increase width
+            text.append(QString(100, QChar::Nbsp));
+            qmesg.setText(text);
+            QString informativeText = QObject::tr("Error message:");
+            qmesg.setWindowTitle(title);
+            qmesg.setDetailedText(cleartextString);
+            qmesg.setIcon(QMessageBox::Warning);
+            qmesg.setSizeGripEnabled(true);
+            qmesg.exec();
+        } else {
+            qmesg.warning(nullptr, title, cleartextString);
         }
-        qmesg.warning(nullptr, title, cleartextString);
+
     }
 }
 
