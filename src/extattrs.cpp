@@ -141,8 +141,7 @@ bool setAttributeValueQString(const QString &path, const QString &attribute, con
       namespacedAttr.append(XATTR_NAMESPACE).append(".").append(attribute);
       int success = setxattr(path.toLatin1().data(),
                                           namespacedAttr.toLatin1().data(),
-                                          value.toLatin1().data(), value.length() + 1, 0); //
-                                          include \0 termination char
+                                          value.toLatin1().data(), value.length() + 1, 0); // include \0 termination char
       // check if we set the attribute value
       return (success == 0);
     #endif
