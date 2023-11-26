@@ -9,7 +9,7 @@
 #endif
 
 #include <QDebug>
-#include <QProcess>
+// #include <QProcess>
 #include <QStandardPaths>
 
 #define XATTR_NAMESPACE "user"
@@ -110,7 +110,7 @@ QString getAttributeValueQString(const QString &path, const QString &attribute, 
 bool setAttributeValueQString(const QString &path, const QString &attribute, const QString &value)
 {
     // set the value from the extended attribute for the path
-
+/*
     QString candidateProgram = QStandardPaths::findExecutable("setextattr"); // FreeBSD
     if (candidateProgram.isEmpty())
         QStandardPaths::findExecutable("setxattr"); // Linux
@@ -128,24 +128,24 @@ bool setAttributeValueQString(const QString &path, const QString &attribute, con
         return false;
     }
     return true;
-
+*/
     // The following does not work on read-only files, e.g., at /usr
-    // #if defined(BSD)
-    //   ssize_t bytesSet = extattr_set_file(path.toLatin1().data(), EXTATTR_NAMESPACE_USER,
-    //                                       attribute.toLatin1().data(), value.toLatin1().data(),
-    //                                       value.length() + 1); // include \0 termination char
-    //   // check if we set the attribute value
-    //   return (bytesSet > 0);
-    // #else
-    //   QString namespacedAttr;
-    //   namespacedAttr.append(XATTR_NAMESPACE).append(".").append(attribute);
-    //   int success = setxattr(path.toLatin1().data(),
-    //                                       namespacedAttr.toLatin1().data(),
-    //                                       value.toLatin1().data(), value.length() + 1, 0); //
-    //                                       include \0 termination char
-    //   // check if we set the attribute value
-    //   return (success == 0);
-    // #endif
+    #if defined(BSD)
+      ssize_t bytesSet = extattr_set_file(path.toLatin1().data(), EXTATTR_NAMESPACE_USER,
+                                          attribute.toLatin1().data(), value.toLatin1().data(),
+                                          value.length() + 1); // include \0 termination char
+      // check if we set the attribute value
+      return (bytesSet > 0);
+    #else
+      QString namespacedAttr;
+      namespacedAttr.append(XATTR_NAMESPACE).append(".").append(attribute);
+      int success = setxattr(path.toLatin1().data(),
+                                          namespacedAttr.toLatin1().data(),
+                                          value.toLatin1().data(), value.length() + 1, 0); //
+                                          include \0 termination char
+      // check if we set the attribute value
+      return (success == 0);
+    #endif
 }
 
 } // namespace Fm
